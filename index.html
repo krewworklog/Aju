@@ -7,41 +7,28 @@
 <link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800&family=Satoshi:wght@300;400;500&display=swap" rel="stylesheet"/>
 <style>
 :root{
-  --bg:#0c0c0e;
-  --s1:#131316;
-  --s2:#1c1c21;
-  --s3:#26262d;
-  --s4:#30303a;
-  --border:rgba(255,255,255,0.06);
-  --border2:rgba(255,255,255,0.11);
-  --ink:#f2f2f5;
-  --ink2:#9999aa;
-  --ink3:#55555f;
-  --accent:#4f6ef7;
-  --accent-d:#3a56e0;
-  --accent-g:rgba(79,110,247,0.15);
-  --accent-b:rgba(79,110,247,0.08);
-  --green:#22c55e;
-  --green-b:rgba(34,197,94,0.1);
-  --amber:#f59e0b;
-  --amber-b:rgba(245,158,11,0.1);
-  --red:#ef4444;
-  --red-b:rgba(239,68,68,0.1);
-  --purple:#a855f7;
-  --purple-b:rgba(168,85,247,0.1);
-  --teal:#14b8a6;
-  --teal-b:rgba(20,184,166,0.1);
+  --bg:#0c0c0e;--s1:#131316;--s2:#1c1c21;--s3:#26262d;--s4:#30303a;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
+  --ink:#f2f2f5;--ink2:#9999aa;--ink3:#55555f;
+  --accent:#4f6ef7;--accent-d:#3a56e0;--accent-g:rgba(79,110,247,0.15);--accent-b:rgba(79,110,247,0.08);
+  --green:#22c55e;--green-b:rgba(34,197,94,0.1);
+  --amber:#f59e0b;--amber-b:rgba(245,158,11,0.1);
+  --red:#ef4444;--red-b:rgba(239,68,68,0.1);
+  --purple:#a855f7;--purple-b:rgba(168,85,247,0.1);
+  --teal:#14b8a6;--teal-b:rgba(20,184,166,0.1);
   --r:8px;--rl:14px;--rxl:20px;
-  --font:'Cabinet Grotesk',sans-serif;
-  --body:'Satoshi',sans-serif;
+  --font:'Cabinet Grotesk',sans-serif;--body:'Satoshi',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{font-size:15px;-webkit-font-smoothing:antialiased;}
 body{font-family:var(--body);background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;}
-.screen{display:none;}.screen.active{display:block;}
+
+/* SCREEN VISIBILITY — only one screen at a time */
+.screen{display:none;}
+.screen.active{display:flex;flex-direction:column;min-height:100vh;}
 
 /* LOGIN */
-#screen-login{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(79,110,247,0.07),transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(168,85,247,0.05),transparent 50%);}
+#screen-login.active{align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(79,110,247,0.07),transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(168,85,247,0.05),transparent 50%);}
 .login-card{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rxl);padding:2.5rem;width:420px;max-width:95vw;box-shadow:0 0 0 1px rgba(255,255,255,0.03),0 32px 64px rgba(0,0,0,0.5);}
 .login-brand{display:flex;align-items:center;gap:10px;margin-bottom:2rem;}
 .brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 4px 16px rgba(79,110,247,0.4);}
@@ -72,10 +59,9 @@ textarea{resize:vertical;line-height:1.6;}
 .btn-success:hover{background:var(--green);color:#0c0c0e;}
 .btn-sm{padding:6px 11px;font-size:12px;}
 .btn-xs{padding:4px 9px;font-size:11px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;}
 
 /* APP */
-#screen-app{display:none;flex-direction:column;min-height:100vh;}
-#screen-app.active{display:flex;}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200;}
 .topbar-l{display:flex;align-items:center;gap:14px;}
 .topbar-brand{font-family:var(--font);font-size:15px;font-weight:800;letter-spacing:-0.04em;}
@@ -87,10 +73,12 @@ textarea{resize:vertical;line-height:1.6;}
 .clock-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--s2);font-size:13px;font-family:var(--font);font-weight:700;letter-spacing:.02em;}
 .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:p 2s infinite;}
 .pulse.red{background:var(--red);}
+.pulse.amber{background:var(--amber);}
 @keyframes p{0%,100%{opacity:1;}50%{opacity:.3;}}
 .dl-chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;font-family:var(--font);}
 .dl-ok{background:var(--green-b);color:var(--green);}
-.dl-late{background:var(--red-b);color:var(--red);}
+.dl-late{background:var(--amber-b);color:var(--amber);}
+.dl-closed{background:var(--red-b);color:var(--red);}
 .user-btn{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;border-radius:20px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:13px;transition:background .12s;}
 .user-btn:hover{background:var(--s3);}
 .avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:var(--font);}
@@ -109,6 +97,7 @@ textarea{resize:vertical;line-height:1.6;}
 .nbadge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;min-width:20px;text-align:center;}
 .nbadge.amber{background:var(--amber);}
 .nbadge.red{background:var(--red);}
+.nbadge.purple{background:var(--purple);}
 
 .content{flex:1;padding:2rem;overflow-y:auto;max-height:calc(100vh - 52px);}
 .page{display:none;}
@@ -145,8 +134,11 @@ textarea{resize:vertical;line-height:1.6;}
 
 .appr-box{background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,.22);border-radius:var(--rl);padding:1.25rem 1.5rem;margin-bottom:1rem;display:none;}
 .appr-box.show{display:block;animation:fu .2s ease;}
+.appr-box.closed{background:rgba(239,68,68,0.07);border-color:rgba(239,68,68,.22);}
 .appr-t{display:flex;align-items:center;gap:8px;font-family:var(--font);font-size:14px;font-weight:800;color:var(--amber);margin-bottom:4px;}
+.appr-box.closed .appr-t{color:var(--red);}
 .appr-s{font-size:13px;color:rgba(245,158,11,.8);margin-bottom:14px;line-height:1.5;}
+.appr-box.closed .appr-s{color:rgba(239,68,68,.8);}
 
 .tag{display:inline-flex;align-items:center;gap:4px;font-family:var(--font);font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.03em;}
 .t-ok{background:var(--green-b);color:var(--green);}
@@ -155,6 +147,7 @@ textarea{resize:vertical;line-height:1.6;}
 .t-cl{background:var(--accent-g);color:var(--accent);}
 .t-pu{background:var(--purple-b);color:var(--purple);}
 .t-used{background:var(--s3);color:var(--ink3);}
+.t-mgr{background:var(--green-b);color:var(--green);}
 
 .ec{background:var(--s1);border:1px solid var(--border);border-radius:var(--rl);padding:1.25rem;margin-bottom:10px;transition:border-color .15s;}
 .ec:hover{border-color:var(--border2);}
@@ -212,21 +205,14 @@ textarea{resize:vertical;line-height:1.6;}
 .etbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
 .etbl tr:hover td{background:var(--s2);}
 
-/* CODE DISPLAY */
-.code-display{
-  background:linear-gradient(135deg,var(--purple-b),var(--accent-b));
-  border:1px solid rgba(168,85,247,.3);
-  border-radius:var(--rl);
-  padding:1.5rem 2rem;
-  margin:1rem 0;
-  text-align:center;
-  position:relative;
-}
+.code-display{background:linear-gradient(135deg,var(--purple-b),var(--accent-b));border:1px solid rgba(168,85,247,.3);border-radius:var(--rl);padding:1.5rem 2rem;margin:1rem 0;text-align:center;position:relative;}
 .code-display-label{font-family:var(--font);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--purple);margin-bottom:8px;}
 .code-display-value{font-family:var(--font);font-size:42px;font-weight:800;letter-spacing:.15em;color:var(--ink);text-shadow:0 0 20px rgba(168,85,247,.4);margin-bottom:4px;}
 .code-display-sub{font-size:12px;color:var(--ink3);margin-top:6px;}
 .copy-btn{position:absolute;top:1rem;right:1rem;background:var(--s3);border:1px solid var(--border2);color:var(--ink2);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--font);font-weight:700;}
 .copy-btn:hover{background:var(--s4);color:var(--ink);}
+
+.info-banner{background:var(--accent-b);border:1px solid rgba(79,110,247,.2);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:1rem;display:flex;align-items:flex-start;gap:8px;}
 
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
@@ -235,32 +221,34 @@ textarea{resize:vertical;line-height:1.6;}
 </head>
 <body>
 
-<!-- LOGIN -->
+<!-- LOGIN SCREEN -->
 <div class="screen active" id="screen-login">
-  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(79,110,247,0.07),transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(168,85,247,0.05),transparent 50%);">
-    <div class="login-card">
-      <div class="login-brand"><div class="brand-mark">📋</div><span class="brand-name">WorkLog</span></div>
-      <div class="login-h">Sign in</div>
-      <p class="login-sub">Marketing team work log portal. Select your role to continue.</p>
-      <div class="tab-row">
-        <button class="tab-btn active" onclick="setLoginRole('staff',this)">Staff</button>
-        <button class="tab-btn" onclick="setLoginRole('manager',this)">Manager</button>
-        <button class="tab-btn" onclick="setLoginRole('exec',this)">Executive</button>
-      </div>
-      <div id="login-staff">
-        <div class="lf"><label>Username</label><input id="l-username" placeholder="Enter your username" autocomplete="username"/></div>
-        <div class="lf"><label>Password</label><input type="password" id="l-password" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
-      </div>
-      <div id="login-mgr" style="display:none">
-        <div class="lf"><label id="mgr-login-label">Manager Password</label><input type="password" id="l-mgrcode" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
-      </div>
-      <div class="login-err" id="l-err">Incorrect credentials. Please try again.</div>
-      <button class="btn btn-primary btn-full" style="margin-top:.75rem" onclick="doLogin()">Sign In →</button>
+  <div class="login-card">
+    <div class="login-brand"><div class="brand-mark">📋</div><span class="brand-name">WorkLog</span></div>
+    <div class="login-h">Sign in</div>
+    <p class="login-sub">Marketing team work log portal. Select your role to continue.</p>
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="setLoginRole('staff',this)">Staff</button>
+      <button class="tab-btn" onclick="setLoginRole('manager',this)">Manager</button>
+      <button class="tab-btn" onclick="setLoginRole('exec',this)">Executive</button>
     </div>
+    <div id="login-staff">
+      <div class="lf"><label>Username</label><input id="l-username" placeholder="Enter your username" autocomplete="username"/></div>
+      <div class="lf"><label>Password</label><input type="password" id="l-password" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    </div>
+    <div id="login-manager" style="display:none">
+      <div class="lf"><label>Username</label><input id="lm-username" placeholder="Manager username" autocomplete="username"/></div>
+      <div class="lf"><label>Password</label><input type="password" id="lm-password" placeholder="Manager password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    </div>
+    <div id="login-exec" style="display:none">
+      <div class="lf"><label>Executive Password</label><input type="password" id="l-execcode" placeholder="Enter executive password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    </div>
+    <div class="login-err" id="l-err">Incorrect credentials. Please try again.</div>
+    <button class="btn btn-primary btn-full" style="margin-top:.75rem" onclick="doLogin()">Sign In →</button>
   </div>
 </div>
 
-<!-- APP -->
+<!-- APP SCREEN -->
 <div class="screen" id="screen-app">
   <header class="topbar">
     <div class="topbar-l"><span class="topbar-brand">WorkLog</span><span class="role-chip" id="role-chip">Staff</span></div>
@@ -286,11 +274,12 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="sbl">Dashboard</div>
         <div class="nav active" onclick="gp('mgr-dash',this)"><span class="nav-ic">📊</span>Overview</div>
         <div class="nav" onclick="gp('mgr-entries',this)"><span class="nav-ic">📄</span>All Entries<span class="nbadge" id="b-mgr">0</span></div>
-        <div class="nav" onclick="gp('mgr-pending',this)"><span class="nav-ic">⏳</span>Pending<span class="nbadge amber" id="b-pend">0</span></div>
+        <div class="nav" onclick="gp('mgr-late',this)"><span class="nav-ic">⏳</span>Late Submissions<span class="nbadge amber" id="b-pend">0</span></div>
+        <div class="sbl">Approvals</div>
+        <div class="nav" onclick="gp('mgr-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-mgr-codes">0</span></div>
         <div class="sbl">Settings</div>
         <div class="nav" onclick="gp('mgr-staff',this)"><span class="nav-ic">👥</span>Staff Accounts</div>
         <div class="nav" onclick="gp('mgr-clients',this)"><span class="nav-ic">🏢</span>Clients</div>
-        <div class="nav" onclick="gp('mgr-codes',this)"><span class="nav-ic">🔑</span>Passwords</div>
       </div>
       <div id="sb-exec" style="display:none">
         <div class="sbl">Executive</div>
@@ -299,7 +288,10 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-clients',this)"><span class="nav-ic">📈</span>By Client</div>
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
         <div class="sbl">Approvals</div>
-        <div class="nav" onclick="gp('exec-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-codes" style="background:var(--purple)">0</span></div>
+        <div class="nav" onclick="gp('exec-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-exec-codes">0</span></div>
+        <div class="sbl">Settings</div>
+        <div class="nav" onclick="gp('exec-managers',this)"><span class="nav-ic">🛡</span>Manager Accounts</div>
+        <div class="nav" onclick="gp('exec-passwd',this)"><span class="nav-ic">🔑</span>Executive Password</div>
       </div>
     </aside>
 
@@ -307,7 +299,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- STAFF: LOG WORK -->
       <div class="page active" id="page-log">
-        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Add one or more client entries for today. Submit before 6:30 PM.</p></div><div style="display:flex;gap:8px" id="edit-controls"></div></div>
+        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Add one or more client entries for today. Submit before 6:30 PM.</p></div></div>
         <div class="card"><div class="ct">Session Info</div><div class="fg">
           <div class="f"><label>Date *</label><input type="date" id="f-date"/></div>
           <div class="f"><label>Staff Name</label><input type="text" id="f-sname" readonly style="opacity:.6;cursor:not-allowed"/></div>
@@ -320,8 +312,8 @@ textarea{resize:vertical;line-height:1.6;}
           <div class="f"><textarea id="f-gnotes" placeholder="Any overall notes for today..." style="min-height:65px"></textarea></div>
         </div>
         <div class="appr-box" id="appr-box">
-          <div class="appr-t">⚠ Late Submission — Executive Approval Code Required</div>
-          <div class="appr-s">It is past 6:30 PM. Submitting now requires a one-time approval code generated by an executive. Request a code from your executive and enter it below.</div>
+          <div class="appr-t" id="appr-title">⚠ Late Submission — Approval Code Required</div>
+          <div class="appr-s" id="appr-text">It is past 6:30 PM. Submitting now requires a one-time code from a manager (before 9 PM) or an executive. Enter the code below.</div>
           <div class="fg">
             <div class="f full"><label style="color:var(--amber)">Reason for Delay *</label><textarea id="f-reason" style="min-height:70px;border-color:rgba(245,158,11,.35)" placeholder="Explain why you are submitting late..."></textarea></div>
             <div class="f full"><label style="color:var(--amber)">One-Time Approval Code *</label><input type="text" id="f-apprcode" style="border-color:rgba(245,158,11,.35);font-family:var(--font);font-size:18px;letter-spacing:.2em;text-align:center;font-weight:800" placeholder="XXXX-XXXX" maxlength="9"/><div class="ferr" id="appr-err"></div></div>
@@ -362,16 +354,29 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="mgr-entries-list"></div>
       </div>
 
-      <!-- MANAGER: PENDING -->
-      <div class="page" id="page-mgr-pending">
-        <div class="ph"><div><div class="pt">Late Submissions</div><p class="ps">Entries submitted after deadline using executive-approved codes.</p></div></div>
-        <div id="pending-list"></div>
+      <!-- MANAGER: LATE -->
+      <div class="page" id="page-mgr-late">
+        <div class="ph"><div><div class="pt">Late Submissions</div><p class="ps">Entries submitted after deadline using approval codes.</p></div></div>
+        <div id="late-list"></div>
+      </div>
+
+      <!-- MANAGER: CODES (6:30-9PM window) -->
+      <div class="page" id="page-mgr-codes">
+        <div class="ph">
+          <div><div class="pt">One-Time Approval Codes</div><p class="ps">Generate single-use codes for staff submitting late. Manager window: 6:30 PM – 9:00 PM. After 9 PM, only the executive can issue codes.</p></div>
+          <button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button>
+        </div>
+        <div id="mgr-code-window-info"></div>
+        <div class="sg" id="mgr-codes-stats"></div>
+        <div class="card"><div class="ct">Codes Issued by You</div>
+          <table class="etbl"><thead><tr><th>Code</th><th>For Staff</th><th>Generated</th><th>Status</th><th>Used By</th><th>Actions</th></tr></thead><tbody id="mgr-codes-tbody"></tbody></table>
+        </div>
       </div>
 
       <!-- MANAGER: STAFF -->
       <div class="page" id="page-mgr-staff">
         <div class="ph"><div><div class="pt">Staff Accounts</div><p class="ps">Create and manage staff login credentials.</p></div><button class="btn btn-primary btn-sm" onclick="openNewStaffModal()">＋ Add Staff</button></div>
-        <div class="card"><table class="stbl" id="staff-table"><thead><tr><th>Name</th><th>Username</th><th>Created</th><th>Entries</th><th>Actions</th></tr></thead><tbody id="staff-tbody"></tbody></table></div>
+        <div class="card"><table class="stbl"><thead><tr><th>Name</th><th>Username</th><th>Created</th><th>Entries</th><th>Actions</th></tr></thead><tbody id="staff-tbody"></tbody></table></div>
       </div>
 
       <!-- MANAGER: CLIENTS -->
@@ -380,31 +385,6 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="card"><div class="ct">Client List</div>
           <ul class="cmgr-list" id="client-list"></ul>
           <div class="add-row"><input type="text" id="new-client" placeholder="New client name..." onkeydown="if(event.key==='Enter')addClient()"/><button class="btn btn-ghost" onclick="addClient()">＋ Add</button></div>
-        </div>
-      </div>
-
-      <!-- MANAGER: PASSWORDS -->
-      <div class="page" id="page-mgr-codes">
-        <div class="ph"><div><div class="pt">Access Passwords</div><p class="ps">Update manager and executive passwords.</p></div></div>
-        <div class="card"><div class="ct">Manager Password</div>
-          <p style="font-size:13px;color:var(--ink2);margin-bottom:1rem">Used to sign in as manager.</p>
-          <div class="fg">
-            <div class="f"><label>Current Password *</label><input type="password" id="mc-cur" placeholder="Current"/></div>
-            <div class="f"><label>New Password *</label><input type="password" id="mc-new" placeholder="New"/></div>
-            <div class="f"><label>Confirm *</label><input type="password" id="mc-con" placeholder="Confirm"/></div>
-          </div>
-          <div class="ferr" id="mc-err" style="display:block;margin-top:8px"></div>
-          <button class="btn btn-ghost" style="margin-top:14px" onclick="changeMgrCode()">Update Manager Password</button>
-        </div>
-        <div class="card"><div class="ct">Executive Password</div>
-          <p style="font-size:13px;color:var(--ink2);margin-bottom:1rem">Used by executives to sign in. Only the executive can also generate one-time approval codes for late submissions.</p>
-          <div class="fg">
-            <div class="f"><label>Manager Password (to verify) *</label><input type="password" id="ec-ver" placeholder="Manager password"/></div>
-            <div class="f"><label>New Executive Password *</label><input type="password" id="ec-new" placeholder="New"/></div>
-            <div class="f"><label>Confirm *</label><input type="password" id="ec-con" placeholder="Confirm"/></div>
-          </div>
-          <div class="ferr" id="ec-err" style="display:block;margin-top:8px"></div>
-          <button class="btn btn-ghost" style="margin-top:14px" onclick="changeExecCode()">Update Executive Password</button>
         </div>
       </div>
 
@@ -445,12 +425,32 @@ textarea{resize:vertical;line-height:1.6;}
       <!-- EXEC: APPROVAL CODES -->
       <div class="page" id="page-exec-codes">
         <div class="ph">
-          <div><div class="pt">One-Time Approval Codes</div><p class="ps">Generate single-use codes for staff submitting after the 6:30 PM deadline. Each code expires immediately after one use.</p></div>
-          <button class="btn btn-primary btn-sm" onclick="openGenCodeModal()">＋ Generate New Code</button>
+          <div><div class="pt">All Approval Codes</div><p class="ps">Executive can generate codes anytime. View codes issued by managers and yourself.</p></div>
+          <button class="btn btn-primary btn-sm" onclick="openGenCodeModal('exec')">＋ Generate New Code</button>
         </div>
-        <div class="sg" id="codes-stats"></div>
-        <div class="card"><div class="ct">Recent Codes</div>
-          <table class="etbl" id="codes-table"><thead><tr><th>Code</th><th>For Staff</th><th>Generated</th><th>Status</th><th>Used By</th><th>Actions</th></tr></thead><tbody id="codes-tbody"></tbody></table>
+        <div class="sg" id="exec-codes-stats"></div>
+        <div class="card"><div class="ct">All Generated Codes</div>
+          <table class="etbl"><thead><tr><th>Code</th><th>For Staff</th><th>Issued By</th><th>Generated</th><th>Status</th><th>Used By</th><th>Actions</th></tr></thead><tbody id="exec-codes-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <!-- EXEC: MANAGER ACCOUNTS -->
+      <div class="page" id="page-exec-managers">
+        <div class="ph"><div><div class="pt">Manager Accounts</div><p class="ps">Create and manage individual manager login credentials.</p></div><button class="btn btn-primary btn-sm" onclick="openNewManagerModal()">＋ Add Manager</button></div>
+        <div class="card"><table class="stbl"><thead><tr><th>Name</th><th>Username</th><th>Created</th><th>Codes Issued</th><th>Actions</th></tr></thead><tbody id="mgr-acct-tbody"></tbody></table></div>
+      </div>
+
+      <!-- EXEC: PASSWORD -->
+      <div class="page" id="page-exec-passwd">
+        <div class="ph"><div><div class="pt">Executive Password</div><p class="ps">Update the executive sign-in password.</p></div></div>
+        <div class="card"><div class="ct">Change Password</div>
+          <div class="fg">
+            <div class="f"><label>Current Password *</label><input type="password" id="ep-cur" placeholder="Current"/></div>
+            <div class="f"><label>New Password *</label><input type="password" id="ep-new" placeholder="New"/></div>
+            <div class="f"><label>Confirm New *</label><input type="password" id="ep-con" placeholder="Confirm"/></div>
+          </div>
+          <div class="ferr" id="ep-err" style="display:block;margin-top:8px"></div>
+          <button class="btn btn-ghost" style="margin-top:14px" onclick="changeExecCode()">Update Password</button>
         </div>
       </div>
 
@@ -458,7 +458,7 @@ textarea{resize:vertical;line-height:1.6;}
   </div>
 </div>
 
-<!-- MODAL: ADD/EDIT STAFF -->
+<!-- MODAL: ADD STAFF -->
 <div class="modal-ov" id="staff-modal">
   <div class="modal">
     <div class="modal-t">Add Staff Account</div>
@@ -473,20 +473,35 @@ textarea{resize:vertical;line-height:1.6;}
   </div>
 </div>
 
-<!-- MODAL: RESET STAFF PASSWORD -->
+<!-- MODAL: ADD MANAGER -->
+<div class="modal-ov" id="manager-modal">
+  <div class="modal">
+    <div class="modal-t">Add Manager Account</div>
+    <p class="modal-s">Create login credentials for a new manager. They'll be able to view dashboards, manage staff, and generate approval codes between 6:30 PM and 9:00 PM.</p>
+    <div class="fg">
+      <div class="f full"><label>Full Name *</label><input type="text" id="mm-name" placeholder="e.g. James Carter"/></div>
+      <div class="f"><label>Username *</label><input type="text" id="mm-user" placeholder="e.g. james.carter"/></div>
+      <div class="f"><label>Password *</label><input type="password" id="mm-pass" placeholder="Set a password"/></div>
+    </div>
+    <div class="ferr" id="mm-err" style="display:block;margin-top:8px"></div>
+    <div class="modal-ft"><button class="btn btn-ghost" onclick="closeModal('manager-modal')">Cancel</button><button class="btn btn-primary" onclick="saveManager()">Save Account</button></div>
+  </div>
+</div>
+
+<!-- MODAL: RESET PASSWORD -->
 <div class="modal-ov" id="reset-modal">
   <div class="modal">
     <div class="modal-t">Reset Password</div>
-    <p class="modal-s" id="reset-modal-s">Set a new password for this staff member.</p>
+    <p class="modal-s" id="reset-modal-s">Set a new password.</p>
     <div class="f" style="margin-bottom:1rem"><label>New Password *</label><input type="password" id="rm-pass" placeholder="New password"/></div>
     <div class="ferr" id="rm-err" style="display:block;margin-top:8px"></div>
     <div class="modal-ft"><button class="btn btn-ghost" onclick="closeModal('reset-modal')">Cancel</button><button class="btn btn-primary" onclick="doResetPass()">Reset Password</button></div>
   </div>
 </div>
 
-<!-- MODAL: GENERATE APPROVAL CODE -->
+<!-- MODAL: GENERATE CODE -->
 <div class="modal-ov" id="gen-code-modal">
-  <div class="modal" id="gen-code-modal-inner">
+  <div class="modal">
     <div id="gen-step1">
       <div class="modal-t">Generate Approval Code</div>
       <p class="modal-s">Create a one-time code for a staff member to submit a late work log. The code expires after a single use.</p>
@@ -498,14 +513,14 @@ textarea{resize:vertical;line-height:1.6;}
     </div>
     <div id="gen-step2" style="display:none">
       <div class="modal-t">Code Generated ✓</div>
-      <p class="modal-s">Share this code with the staff member. It can only be used once and expires after submission.</p>
+      <p class="modal-s">Share this code with the staff member. It can only be used once.</p>
       <div class="code-display">
         <button class="copy-btn" onclick="copyCode()">📋 Copy</button>
         <div class="code-display-label">One-Time Code</div>
         <div class="code-display-value" id="gen-code-value">XXXX-XXXX</div>
         <div class="code-display-sub">For: <strong id="gen-code-for"></strong></div>
       </div>
-      <div style="background:var(--amber-b);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--amber);margin-top:1rem">⚠ Save this code now. For security, it cannot be retrieved again — only its status (used/unused) will be visible later.</div>
+      <div style="background:var(--amber-b);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--amber);margin-top:1rem">⚠ Save this code now. For security, it cannot be retrieved again.</div>
       <div class="modal-ft"><button class="btn btn-primary" onclick="closeModal('gen-code-modal')">Done</button></div>
     </div>
   </div>
@@ -518,62 +533,101 @@ textarea{resize:vertical;line-height:1.6;}
 //  STATE
 // ════════════════════════════════════════
 let DB = {
-  staffAccounts: JSON.parse(localStorage.getItem('wl4_staff') || '[]'),
-  entries: JSON.parse(localStorage.getItem('wl4_entries') || '[]'),
-  clients: JSON.parse(localStorage.getItem('wl4_clients') || JSON.stringify([
+  staffAccounts: JSON.parse(localStorage.getItem('wl5_staff') || '[]'),
+  managerAccounts: JSON.parse(localStorage.getItem('wl5_mgrs') || '[]'),
+  entries: JSON.parse(localStorage.getItem('wl5_entries') || '[]'),
+  clients: JSON.parse(localStorage.getItem('wl5_clients') || JSON.stringify([
     'Baaqat Flowers','Flovia Flowers','8th Cafe','Florens Flowers',
     'Flat Chocolate','Al Rasa','Fedora Perfumes','Elite Party','Hair Salon'
   ])),
-  mgrCode: localStorage.getItem('wl4_mcode') || '74746',
-  execCode: localStorage.getItem('wl4_ecode') || '99999',
-  approvalCodes: JSON.parse(localStorage.getItem('wl4_codes') || '[]'),
+  execCode: localStorage.getItem('wl5_ecode') || '99999',
+  approvalCodes: JSON.parse(localStorage.getItem('wl5_codes') || '[]'),
 };
 
 let session = { user: null, role: null };
 let editingId = null;
 let ceCount = 0;
-let resetTargetId = null;
+let resetTarget = null; // {type:'staff'|'manager', id}
 let loginRole = 'staff';
 let lastGeneratedCode = null;
+let genCodeContext = null; // 'manager' | 'exec'
 
 function save() {
-  localStorage.setItem('wl4_staff', JSON.stringify(DB.staffAccounts));
-  localStorage.setItem('wl4_entries', JSON.stringify(DB.entries));
-  localStorage.setItem('wl4_clients', JSON.stringify(DB.clients));
-  localStorage.setItem('wl4_mcode', DB.mgrCode);
-  localStorage.setItem('wl4_ecode', DB.execCode);
-  localStorage.setItem('wl4_codes', JSON.stringify(DB.approvalCodes));
+  localStorage.setItem('wl5_staff', JSON.stringify(DB.staffAccounts));
+  localStorage.setItem('wl5_mgrs', JSON.stringify(DB.managerAccounts));
+  localStorage.setItem('wl5_entries', JSON.stringify(DB.entries));
+  localStorage.setItem('wl5_clients', JSON.stringify(DB.clients));
+  localStorage.setItem('wl5_ecode', DB.execCode);
+  localStorage.setItem('wl5_codes', JSON.stringify(DB.approvalCodes));
 }
 
-// CLOCK
+// ════════════════════════════════════════
+//  TIME WINDOWS
+// ════════════════════════════════════════
 function pad(n){return String(n).padStart(2,'0');}
-function isLate(){const n=new Date();return n.getHours()>18||(n.getHours()===18&&n.getMinutes()>=30);}
 function todayStr(){return new Date().toISOString().slice(0,10);}
 function nowTime(){const n=new Date();return `${pad(n.getHours())}:${pad(n.getMinutes())}`;}
+function timeWindow(){
+  // 'open' = before 6:30 PM, 'manager' = 6:30-9:00 PM, 'exec' = after 9:00 PM
+  const n=new Date();const mins=n.getHours()*60+n.getMinutes();
+  if(mins < 18*60+30) return 'open';
+  if(mins < 21*60) return 'manager';
+  return 'exec';
+}
+function isLate(){return timeWindow()!=='open';}
+function canManagerIssueCodes(){return timeWindow()==='manager';}
+function canExecIssueCodes(){return true;} // exec can always
 
 function updateClock(){
   const n=new Date();
   document.getElementById('clock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  const late=isLate();
-  document.getElementById('cdot').className='pulse'+(late?' red':'');
+  const win=timeWindow();
+  const cdot=document.getElementById('cdot');
   const dc=document.getElementById('dl-chip');
-  if(late){dc.className='dl-chip dl-late';dc.textContent='Past deadline';}
-  else{const rem=(18*60+30)-(n.getHours()*60+n.getMinutes());dc.className='dl-chip dl-ok';dc.textContent=`${Math.floor(rem/60)}h ${rem%60}m left`;}
+  if(win==='open'){
+    cdot.className='pulse';
+    const rem=(18*60+30)-(n.getHours()*60+n.getMinutes());
+    dc.className='dl-chip dl-ok';dc.textContent=`${Math.floor(rem/60)}h ${rem%60}m to deadline`;
+  } else if(win==='manager'){
+    cdot.className='pulse amber';
+    const rem=(21*60)-(n.getHours()*60+n.getMinutes());
+    dc.className='dl-chip dl-late';dc.textContent=`Late · Manager window (${Math.floor(rem/60)}h ${rem%60}m left)`;
+  } else {
+    cdot.className='pulse red';
+    dc.className='dl-chip dl-closed';dc.textContent='Executive approval only';
+  }
+  // approval box on staff log page
   const ab=document.getElementById('appr-box');
-  if(ab)ab.className='appr-box'+(late?' show':'');
+  if(ab){
+    ab.className='appr-box'+(win!=='open'?' show':'')+(win==='exec'?' closed':'');
+    const at=document.getElementById('appr-title');
+    const atx=document.getElementById('appr-text');
+    if(win==='manager'){
+      at.textContent='⚠ Late Submission — Approval Code Required';
+      atx.textContent='It is past 6:30 PM. A manager or executive can issue a one-time approval code. Request a code and enter it below.';
+    } else if(win==='exec'){
+      at.textContent='⛔ Late Submission — Executive Approval Only';
+      atx.textContent='It is past 9:00 PM. Only an executive can issue a one-time approval code now. Request a code and enter it below.';
+    }
+  }
+  // refresh manager codes page window banner if on that page
+  if(session.role==='manager'&&document.getElementById('page-mgr-codes').classList.contains('active')){
+    refreshMgrCodeWindowInfo();
+  }
 }
-setInterval(updateClock,20000);
+setInterval(updateClock,15000);
 
-// LOGIN
+// ════════════════════════════════════════
+//  LOGIN — strict screen swap, no overlap
+// ════════════════════════════════════════
 function setLoginRole(role,el){
   loginRole=role;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('l-err').style.display='none';
-  const ms=document.getElementById('login-mgr');
-  const ss=document.getElementById('login-staff');
-  if(role==='staff'){ss.style.display='block';ms.style.display='none';}
-  else{ss.style.display='none';ms.style.display='block';document.getElementById('mgr-login-label').textContent=role==='manager'?'Manager Password':'Executive Password';}
+  document.getElementById('login-staff').style.display=role==='staff'?'block':'none';
+  document.getElementById('login-manager').style.display=role==='manager'?'block':'none';
+  document.getElementById('login-exec').style.display=role==='exec'?'block':'none';
 }
 
 function doLogin(){
@@ -585,25 +639,32 @@ function doLogin(){
     if(!a){err.style.display='block';return;}
     session={user:a,role:'staff'};
   }else if(loginRole==='manager'){
-    if(document.getElementById('l-mgrcode').value.trim()!==DB.mgrCode){err.style.display='block';return;}
-    session={user:{name:'Manager',username:'manager'},role:'manager'};
+    const u=document.getElementById('lm-username').value.trim();
+    const p=document.getElementById('lm-password').value.trim();
+    const a=DB.managerAccounts.find(a=>a.username===u&&a.password===p);
+    if(!a){err.style.display='block';return;}
+    session={user:a,role:'manager'};
   }else{
-    if(document.getElementById('l-mgrcode').value.trim()!==DB.execCode){err.style.display='block';return;}
-    session={user:{name:'Executive',username:'exec'},role:'exec'};
+    if(document.getElementById('l-execcode').value.trim()!==DB.execCode){err.style.display='block';return;}
+    session={user:{name:'Executive',username:'exec',id:'exec'},role:'exec'};
   }
   launchApp();
 }
 
 function logout(){
   session={user:null,role:null};editingId=null;
+  // Strict swap: deactivate app, activate login
   document.getElementById('screen-app').classList.remove('active');
   document.getElementById('screen-login').classList.add('active');
   document.getElementById('l-username').value='';
   document.getElementById('l-password').value='';
-  document.getElementById('l-mgrcode').value='';
+  document.getElementById('lm-username').value='';
+  document.getElementById('lm-password').value='';
+  document.getElementById('l-execcode').value='';
 }
 
 function launchApp(){
+  // STRICT: remove .active from login first, then add to app
   document.getElementById('screen-login').classList.remove('active');
   document.getElementById('screen-app').classList.add('active');
   const role=session.role;const name=session.user.name;
@@ -627,11 +688,27 @@ function gp(id,el){
   document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   if(el)el.classList.add('active');
-  const r={'mgr-dash':renderMgrDash,'mgr-entries':()=>{fillClientFilter('mf-client');renderMgrEntries();},'mgr-pending':renderPending,'mgr-staff':renderStaffTable,'mgr-clients':renderClientList,'my-logs':renderMyLogs,'exec-dash':renderExecDash,'exec-entries':()=>{fillClientFilter('ef-client');renderExecEntries();},'exec-clients':renderExecClients,'exec-staff':renderExecStaff,'exec-codes':renderCodesPage};
+  const r={
+    'mgr-dash':renderMgrDash,
+    'mgr-entries':()=>{fillClientFilter('mf-client');renderMgrEntries();},
+    'mgr-late':renderLateList,
+    'mgr-staff':renderStaffTable,
+    'mgr-clients':renderClientList,
+    'mgr-codes':renderMgrCodesPage,
+    'my-logs':renderMyLogs,
+    'exec-dash':renderExecDash,
+    'exec-entries':()=>{fillClientFilter('ef-client');renderExecEntries();},
+    'exec-clients':renderExecClients,
+    'exec-staff':renderExecStaff,
+    'exec-codes':renderExecCodesPage,
+    'exec-managers':renderManagerTable,
+  };
   if(r[id])r[id]();
 }
 
-// LOG FORM
+// ════════════════════════════════════════
+//  LOG FORM
+// ════════════════════════════════════════
 function initLogForm(){
   document.getElementById('f-date').value=todayStr();
   document.getElementById('f-sname').value=session.user.name;
@@ -644,12 +721,10 @@ function initLogForm(){
   document.getElementById('cancel-btn').style.display='none';
   editingId=null;updateClock();
 }
-
 function buildClientOpts(sel,val){
   sel.innerHTML='<option value="">— Select client —</option>';
   DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;if(c===val)o.selected=true;sel.appendChild(o);});
 }
-
 function addCE(data){
   ceCount++;
   const rowId='ce-'+Date.now()+ceCount;
@@ -665,7 +740,6 @@ function addCE(data){
   buildClientOpts(div.querySelector('.cr-cl'),data?data.client:'');
   if(data){div.querySelector('.cr-hr').value=data.hours;div.querySelector('.cr-tk').value=data.tasks;}
 }
-
 function getCERows(){
   return Array.from(document.querySelectorAll('.ce-row')).map(row=>({
     client:row.querySelector('.cr-cl').value,
@@ -674,9 +748,7 @@ function getCERows(){
   }));
 }
 
-// ════════════════════════════════════════
-//  SUBMIT (with one-time code logic)
-// ════════════════════════════════════════
+// SUBMIT
 function submitLog(){
   const date=document.getElementById('f-date').value;
   const gnotes=document.getElementById('f-gnotes').value.trim();
@@ -691,19 +763,16 @@ function submitLog(){
   let reason='',approved=false,usedCodeId=null;
   const staffId=session.user.id||session.user.username;
   const staffName=session.user.name;
-
   if(late&&!editingId){
     reason=document.getElementById('f-reason').value.trim();
     const code=document.getElementById('f-apprcode').value.trim().toUpperCase();
     const errEl=document.getElementById('appr-err');errEl.style.display='none';
     if(!reason){toast('Enter a reason for the late submission.','err');return;}
     if(!code){errEl.textContent='Please enter the approval code.';errEl.style.display='block';return;}
-    // Validate one-time code
     const matchCode=DB.approvalCodes.find(c=>c.code===code);
-    if(!matchCode){errEl.textContent='Invalid code. Request one from your executive.';errEl.style.display='block';return;}
+    if(!matchCode){errEl.textContent='Invalid code. Request one from a manager or executive.';errEl.style.display='block';return;}
     if(matchCode.used){errEl.textContent='This code has already been used. Request a new one.';errEl.style.display='block';return;}
-    if(matchCode.staffId&&matchCode.staffId!==staffId){errEl.textContent=`This code was issued for a different staff member.`;errEl.style.display='block';return;}
-    // Mark used
+    if(matchCode.staffId&&matchCode.staffId!==staffId){errEl.textContent='This code was issued for a different staff member.';errEl.style.display='block';return;}
     matchCode.used=true;
     matchCode.usedBy=staffId;
     matchCode.usedByName=staffName;
@@ -711,7 +780,6 @@ function submitLog(){
     usedCodeId=matchCode.id;
     approved=true;
   }
-
   const submittedAt=nowTime();
   if(editingId!==null){
     const idx=DB.entries.findIndex(e=>e.id===editingId);
@@ -723,18 +791,14 @@ function submitLog(){
   }
   save();updateBadges();initLogForm();
 }
-
 function cancelEdit(){editingId=null;initLogForm();}
 
 // MY LOGS
 function renderMyLogs(){
   const mine=DB.entries.filter(e=>e.staffId===(session.user.id||session.user.username)).reverse();
   const el=document.getElementById('my-logs-list');
-  if(!mine.length){el.innerHTML=emptyState('📭','No entries yet. Start logging your work!');return;}
-  el.innerHTML=mine.map(e=>entryCard(e,true)).join('');
+  el.innerHTML=mine.length?mine.map(e=>entryCard(e,true)).join(''):emptyState('📭','No entries yet.');
 }
-
-// EDIT/DELETE
 function editEntry(id){
   if(isLate()){toast('Editing is locked after 6:30 PM.','err');return;}
   const e=DB.entries.find(en=>en.id===id);if(!e)return;
@@ -759,6 +823,8 @@ function deleteEntry(id){
 function entryCard(e,isOwner){
   const totH=(e.rows||[]).reduce((s,r)=>s+(r.hours||0),0);
   const canEdit=isOwner&&!isLate();
+  const code=e.usedCodeId?DB.approvalCodes.find(c=>c.id===e.usedCodeId):null;
+  const codeIssuerLabel=code?(code.issuedByRole==='exec'?'Executive':code.issuedByName||'Manager'):'';
   return `<div class="ec">
     <div class="ec-top">
       <div><div class="ec-name">${e.staffName}</div><div class="ec-un">@${e.staffId}</div></div>
@@ -767,7 +833,7 @@ function entryCard(e,isOwner){
         ${e.editedAt?`<span class="tag t-pu" style="font-size:10px">✏ Edited</span>`:''}
       </div>
     </div>
-    <div class="ec-meta"><span>📅 ${e.date}</span><span>🕐 Submitted ${e.submittedAt}</span><span>⏱ ${totH.toFixed(1)}h total</span></div>
+    <div class="ec-meta"><span>📅 ${e.date}</span><span>🕐 Submitted ${e.submittedAt}</span><span>⏱ ${totH.toFixed(1)}h total</span>${codeIssuerLabel?`<span>🎟 By ${codeIssuerLabel}</span>`:''}</div>
     <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span></div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div></div>`).join('')}</div>
     ${e.gnotes?`<div class="ec-notes">💬 ${e.gnotes}</div>`:''}
     ${e.late&&e.reason?`<div class="ec-reason">📋 Late reason: ${e.reason}</div>`:''}
@@ -785,7 +851,7 @@ function renderMgrDash(){
     <div class="sc"><div class="sl">Total Entries</div><div class="sv sv-ac">${DB.entries.length}</div><div class="ss">all time</div></div>
     <div class="sc"><div class="sl">Today</div><div class="sv sv-gr">${todayE.length}</div><div class="ss">${today}</div></div>
     <div class="sc"><div class="sl">Total Hours</div><div class="sv">${totH.toFixed(1)}</div><div class="ss">all time</div></div>
-    <div class="sc"><div class="sl">Late Entries</div><div class="sv sv-am">${late}</div><div class="ss">approved by exec</div></div>
+    <div class="sc"><div class="sl">Late Entries</div><div class="sv sv-am">${late}</div><div class="ss">all time</div></div>
     <div class="sc"><div class="sl">Staff Accounts</div><div class="sv sv-te">${DB.staffAccounts.length}</div><div class="ss">registered</div></div>`;
   barChart('bc-staff',staffHoursMap());
   barChart('bc-client',clientHoursMap());
@@ -793,13 +859,12 @@ function renderMgrDash(){
   if(!todayE.length){tl.innerHTML='<p style="font-size:13px;color:var(--ink3);padding:1rem 0">No submissions today.</p>';return;}
   tl.innerHTML=todayE.map(e=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)"><div><div style="font-family:var(--font);font-size:14px;font-weight:800">${e.staffName} <span style="font-weight:400;color:var(--ink3);font-size:12px">@${e.staffId}</span></div><div style="font-size:12px;color:var(--ink3);margin-top:2px">${totalH(e)}h · ${(e.rows||[]).map(r=>r.client).join(', ')}</div></div><span class="tag ${e.late?'t-late':'t-ok'}">${e.late?'Late':'On time'}</span></div>`).join('');
 }
-
 function renderMgrEntries(){
   const nf=document.getElementById('mf-name').value.toLowerCase();
   const cf=document.getElementById('mf-client').value;
   const sf=document.getElementById('mf-status').value;
   const df=document.getElementById('mf-date').value;
-  let data=[...DB.entries].reverse().filter(e=>{
+  const data=[...DB.entries].reverse().filter(e=>{
     if(nf&&!e.staffName.toLowerCase().includes(nf)&&!e.staffId.toLowerCase().includes(nf))return false;
     if(cf&&!(e.rows||[]).some(r=>r.client===cf))return false;
     if(sf==='ontime'&&e.late)return false;
@@ -809,15 +874,12 @@ function renderMgrEntries(){
   });
   document.getElementById('mgr-entries-list').innerHTML=data.length?data.map(e=>entryCard(e,false)).join(''):emptyState('📭','No entries match filters.');
 }
-
-function renderPending(){
+function renderLateList(){
   const late=DB.entries.filter(e=>e.late).reverse();
-  const el=document.getElementById('pending-list');
-  if(!late.length){el.innerHTML=emptyState('✅','No late submissions yet.');return;}
-  el.innerHTML=late.map(e=>entryCard(e,false)).join('');
+  document.getElementById('late-list').innerHTML=late.length?late.map(e=>entryCard(e,false)).join(''):emptyState('✅','No late submissions yet.');
 }
 
-// STAFF ACCOUNTS
+// STAFF
 function renderStaffTable(){
   const tbody=document.getElementById('staff-tbody');
   if(!DB.staffAccounts.length){tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink3)">No staff accounts yet.</td></tr>`;return;}
@@ -828,7 +890,7 @@ function renderStaffTable(){
       <td style="color:var(--ink2)">@${a.username}</td>
       <td style="color:var(--ink3)">${a.createdAt||'—'}</td>
       <td><span class="tag" style="background:var(--accent-g);color:var(--accent)">${count}</span></td>
-      <td><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-xs" onclick="openResetModal('${a.id}','${a.name}')">Reset Password</button><button class="btn btn-danger btn-xs" onclick="deleteStaff('${a.id}')">✕</button></div></td>
+      <td><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-xs" onclick="openResetModal('staff','${a.id}','${a.name}')">Reset Pass</button><button class="btn btn-danger btn-xs" onclick="deleteStaff('${a.id}')">✕</button></div></td>
     </tr>`;
   }).join('');
 }
@@ -847,8 +909,53 @@ function saveStaff(){
   DB.staffAccounts.push({id:'s'+Date.now(),name,username:uname,password:pass,createdAt:todayStr()});
   save();renderStaffTable();closeModal('staff-modal');toast(`Account created for ${name}.`,'ok');
 }
-function openResetModal(id,name){
-  resetTargetId=id;
+function deleteStaff(id){
+  const a=DB.staffAccounts.find(a=>a.id===id);
+  if(!confirm(`Remove account for ${a?a.name:'this staff'}?`))return;
+  DB.staffAccounts=DB.staffAccounts.filter(a=>a.id!==id);
+  save();renderStaffTable();toast('Account removed.');
+}
+
+// MANAGER ACCOUNTS (Exec)
+function renderManagerTable(){
+  const tbody=document.getElementById('mgr-acct-tbody');
+  if(!DB.managerAccounts.length){tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink3)">No manager accounts yet. Click "Add Manager" to create one.</td></tr>`;return;}
+  tbody.innerHTML=DB.managerAccounts.map(a=>{
+    const codeCount=DB.approvalCodes.filter(c=>c.issuedById===a.id).length;
+    return `<tr>
+      <td style="font-family:var(--font);font-weight:800">${a.name}</td>
+      <td style="color:var(--ink2)">@${a.username}</td>
+      <td style="color:var(--ink3)">${a.createdAt||'—'}</td>
+      <td><span class="tag t-mgr">${codeCount}</span></td>
+      <td><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-xs" onclick="openResetModal('manager','${a.id}','${a.name}')">Reset Pass</button><button class="btn btn-danger btn-xs" onclick="deleteManager('${a.id}')">✕</button></div></td>
+    </tr>`;
+  }).join('');
+}
+function openNewManagerModal(){
+  document.getElementById('mm-name').value='';document.getElementById('mm-user').value='';document.getElementById('mm-pass').value='';
+  document.getElementById('mm-err').style.display='none';
+  document.getElementById('manager-modal').classList.add('show');
+}
+function saveManager(){
+  const name=document.getElementById('mm-name').value.trim();
+  const uname=document.getElementById('mm-user').value.trim().toLowerCase().replace(/\s+/g,'.');
+  const pass=document.getElementById('mm-pass').value.trim();
+  const err=document.getElementById('mm-err');err.style.display='none';
+  if(!name||!uname||!pass){err.textContent='All fields are required.';err.style.display='block';return;}
+  if(DB.managerAccounts.find(a=>a.username===uname)){err.textContent='Username already exists.';err.style.display='block';return;}
+  DB.managerAccounts.push({id:'m'+Date.now(),name,username:uname,password:pass,createdAt:todayStr()});
+  save();renderManagerTable();closeModal('manager-modal');toast(`Manager account created for ${name}.`,'ok');
+}
+function deleteManager(id){
+  const a=DB.managerAccounts.find(a=>a.id===id);
+  if(!confirm(`Remove manager account for ${a?a.name:'this manager'}?`))return;
+  DB.managerAccounts=DB.managerAccounts.filter(a=>a.id!==id);
+  save();renderManagerTable();toast('Manager account removed.');
+}
+
+// RESET PASSWORDS (staff OR manager)
+function openResetModal(type,id,name){
+  resetTarget={type,id};
   document.getElementById('reset-modal-s').textContent=`Set a new password for ${name}.`;
   document.getElementById('rm-pass').value='';document.getElementById('rm-err').style.display='none';
   document.getElementById('reset-modal').classList.add('show');
@@ -857,22 +964,19 @@ function doResetPass(){
   const pass=document.getElementById('rm-pass').value.trim();
   const err=document.getElementById('rm-err');
   if(!pass){err.textContent='Password cannot be empty.';err.style.display='block';return;}
-  const a=DB.staffAccounts.find(a=>a.id===resetTargetId);if(a)a.password=pass;
-  save();closeModal('reset-modal');toast('Password reset.','ok');
-}
-function deleteStaff(id){
-  const a=DB.staffAccounts.find(a=>a.id===id);
-  if(!confirm(`Remove account for ${a?a.name:'this staff'}?`))return;
-  DB.staffAccounts=DB.staffAccounts.filter(a=>a.id!==id);
-  save();renderStaffTable();toast('Account removed.');
+  const list=resetTarget.type==='staff'?DB.staffAccounts:DB.managerAccounts;
+  const a=list.find(a=>a.id===resetTarget.id);if(a)a.password=pass;
+  save();closeModal('reset-modal');
+  if(resetTarget.type==='staff')renderStaffTable();else renderManagerTable();
+  toast('Password reset.','ok');
 }
 function closeModal(id){
   document.getElementById(id).classList.remove('show');
-  // reset gen-code modal
   if(id==='gen-code-modal'){
     document.getElementById('gen-step1').style.display='block';
     document.getElementById('gen-step2').style.display='none';
-    if(session.role==='exec')renderCodesPage();
+    if(session.role==='manager')renderMgrCodesPage();
+    else if(session.role==='exec')renderExecCodesPage();
   }
 }
 
@@ -892,43 +996,34 @@ function removeClient(i){
   DB.clients.splice(i,1);save();renderClientList();toast('Client removed.');
 }
 
-// CODES (MGR)
-function changeMgrCode(){
-  const cur=document.getElementById('mc-cur').value.trim();
-  const nw=document.getElementById('mc-new').value.trim();
-  const con=document.getElementById('mc-con').value.trim();
-  const err=document.getElementById('mc-err');err.style.display='none';
-  if(cur!==DB.mgrCode){err.textContent='Current password is incorrect.';err.style.display='block';return;}
-  if(!nw){err.textContent='New password cannot be empty.';err.style.display='block';return;}
-  if(nw!==con){err.textContent='Passwords do not match.';err.style.display='block';return;}
-  DB.mgrCode=nw;save();
-  ['mc-cur','mc-new','mc-con'].forEach(id=>document.getElementById(id).value='');
-  toast('Manager password updated.','ok');
-}
+// EXEC PASSWORD
 function changeExecCode(){
-  const ver=document.getElementById('ec-ver').value.trim();
-  const nw=document.getElementById('ec-new').value.trim();
-  const con=document.getElementById('ec-con').value.trim();
-  const err=document.getElementById('ec-err');err.style.display='none';
-  if(ver!==DB.mgrCode){err.textContent='Manager password is incorrect.';err.style.display='block';return;}
+  const cur=document.getElementById('ep-cur').value.trim();
+  const nw=document.getElementById('ep-new').value.trim();
+  const con=document.getElementById('ep-con').value.trim();
+  const err=document.getElementById('ep-err');err.style.display='none';
+  if(cur!==DB.execCode){err.textContent='Current password is incorrect.';err.style.display='block';return;}
   if(!nw){err.textContent='New password cannot be empty.';err.style.display='block';return;}
   if(nw!==con){err.textContent='Passwords do not match.';err.style.display='block';return;}
   DB.execCode=nw;save();
-  ['ec-ver','ec-new','ec-con'].forEach(id=>document.getElementById(id).value='');
+  ['ep-cur','ep-new','ep-con'].forEach(id=>document.getElementById(id).value='');
   toast('Executive password updated.','ok');
 }
 
 // ════════════════════════════════════════
-//  EXEC: ONE-TIME APPROVAL CODES
+//  APPROVAL CODES
 // ════════════════════════════════════════
 function generateCodeString(){
-  // 8-char alphanumeric, no ambiguous chars (no 0/O/1/I)
   const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let s='';for(let i=0;i<8;i++)s+=chars[Math.floor(Math.random()*chars.length)];
   return s.slice(0,4)+'-'+s.slice(4);
 }
-function openGenCodeModal(){
-  // populate staff dropdown
+function openGenCodeModal(ctx){
+  genCodeContext=ctx;
+  // Check eligibility for manager
+  if(ctx==='manager'&&!canManagerIssueCodes()){
+    toast('Managers can only issue codes between 6:30 PM and 9:00 PM.','err');return;
+  }
   const sel=document.getElementById('gc-staff');
   sel.innerHTML='<option value="">— Select staff —</option><option value="any">Any staff member</option>';
   DB.staffAccounts.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=`${a.name} (@${a.username})`;sel.appendChild(o);});
@@ -941,6 +1036,10 @@ function generateCode(){
   const staffSel=document.getElementById('gc-staff').value;
   const note=document.getElementById('gc-note').value.trim();
   if(!staffSel){toast('Please select a staff member.','err');return;}
+  // Re-check window for manager
+  if(genCodeContext==='manager'&&!canManagerIssueCodes()){
+    toast('Manager code window has closed (9 PM). Ask the executive.','err');closeModal('gen-code-modal');return;
+  }
   let staffId=null,staffName='Any staff';
   if(staffSel!=='any'){
     const a=DB.staffAccounts.find(a=>a.id===staffSel);
@@ -950,17 +1049,14 @@ function generateCode(){
   let code;do{code=generateCodeString();}while(DB.approvalCodes.find(c=>c.code===code));
   const newCode={
     id:'c'+Date.now(),
-    code,
-    staffId,
-    staffName,
-    note,
+    code,staffId,staffName,note,
+    issuedByRole:session.role,
+    issuedById:session.user.id||session.user.username,
+    issuedByName:session.user.name,
     generatedAt:new Date().toISOString(),
     generatedDate:todayStr(),
     generatedTime:nowTime(),
-    used:false,
-    usedBy:null,
-    usedByName:null,
-    usedAt:null
+    used:false,usedBy:null,usedByName:null,usedAt:null
   };
   DB.approvalCodes.push(newCode);
   save();
@@ -970,35 +1066,78 @@ function generateCode(){
   document.getElementById('gen-step1').style.display='none';
   document.getElementById('gen-step2').style.display='block';
   toast('Code generated.','ok');
+  updateBadges();
 }
 function copyCode(){
-  navigator.clipboard.writeText(lastGeneratedCode).then(()=>toast('Code copied to clipboard.','ok'),()=>toast('Copy failed.','err'));
+  navigator.clipboard.writeText(lastGeneratedCode).then(()=>toast('Code copied.','ok'),()=>toast('Copy failed.','err'));
 }
-function renderCodesPage(){
-  const total=DB.approvalCodes.length;
-  const used=DB.approvalCodes.filter(c=>c.used).length;
+
+// Manager codes page
+function refreshMgrCodeWindowInfo(){
+  const win=timeWindow();
+  const el=document.getElementById('mgr-code-window-info');
+  const btn=document.getElementById('mgr-gen-btn');
+  if(win==='manager'){
+    el.innerHTML=`<div class="info-banner" style="background:var(--green-b);border-color:rgba(34,197,94,.2);color:var(--green)"><span>✓</span><span>You can issue approval codes now. Manager window closes at 9:00 PM.</span></div>`;
+    btn.disabled=false;
+  }else if(win==='open'){
+    el.innerHTML=`<div class="info-banner"><span>ℹ</span><span>No late submissions yet. Manager approval codes can be issued between 6:30 PM and 9:00 PM.</span></div>`;
+    btn.disabled=true;
+  }else{
+    el.innerHTML=`<div class="info-banner" style="background:var(--red-b);border-color:rgba(239,68,68,.2);color:var(--red)"><span>⛔</span><span>Manager window has closed (past 9:00 PM). Only the executive can issue codes now.</span></div>`;
+    btn.disabled=true;
+  }
+}
+function renderMgrCodesPage(){
+  refreshMgrCodeWindowInfo();
+  const mine=DB.approvalCodes.filter(c=>c.issuedById===(session.user.id||session.user.username));
+  const total=mine.length;
+  const used=mine.filter(c=>c.used).length;
   const unused=total-used;
-  const todayCodes=DB.approvalCodes.filter(c=>c.generatedDate===todayStr()).length;
-  document.getElementById('codes-stats').innerHTML=`
-    <div class="sc"><div class="sl">Total Generated</div><div class="sv sv-pu">${total}</div><div class="ss">all time</div></div>
-    <div class="sc"><div class="sl">Used</div><div class="sv sv-gr">${used}</div><div class="ss">consumed by staff</div></div>
-    <div class="sc"><div class="sl">Active</div><div class="sv sv-am">${unused}</div><div class="ss">unused codes</div></div>
+  const todayCodes=mine.filter(c=>c.generatedDate===todayStr()).length;
+  document.getElementById('mgr-codes-stats').innerHTML=`
+    <div class="sc"><div class="sl">Issued by You</div><div class="sv sv-pu">${total}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Used</div><div class="sv sv-gr">${used}</div><div class="ss">consumed</div></div>
+    <div class="sc"><div class="sl">Active</div><div class="sv sv-am">${unused}</div><div class="ss">unused</div></div>
     <div class="sc"><div class="sl">Today</div><div class="sv sv-ac">${todayCodes}</div><div class="ss">${todayStr()}</div></div>`;
-  const tbody=document.getElementById('codes-tbody');
-  if(!total){tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ink3)">No codes generated yet. Click "Generate New Code" to create one.</td></tr>`;return;}
-  tbody.innerHTML=[...DB.approvalCodes].reverse().map(c=>`<tr>
+  const tbody=document.getElementById('mgr-codes-tbody');
+  if(!total){tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ink3)">You haven't issued any codes yet.</td></tr>`;return;}
+  tbody.innerHTML=[...mine].reverse().map(c=>codeRow(c,true)).join('');
+}
+// Exec codes page (all codes)
+function renderExecCodesPage(){
+  const all=DB.approvalCodes;
+  const total=all.length;
+  const used=all.filter(c=>c.used).length;
+  const unused=total-used;
+  const byMgr=all.filter(c=>c.issuedByRole==='manager').length;
+  document.getElementById('exec-codes-stats').innerHTML=`
+    <div class="sc"><div class="sl">Total Codes</div><div class="sv sv-pu">${total}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Used</div><div class="sv sv-gr">${used}</div><div class="ss">consumed</div></div>
+    <div class="sc"><div class="sl">Active</div><div class="sv sv-am">${unused}</div><div class="ss">unused</div></div>
+    <div class="sc"><div class="sl">By Managers</div><div class="sv sv-te">${byMgr}</div><div class="ss">vs ${total-byMgr} by exec</div></div>`;
+  const tbody=document.getElementById('exec-codes-tbody');
+  if(!total){tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--ink3)">No codes generated yet.</td></tr>`;return;}
+  tbody.innerHTML=[...all].reverse().map(c=>codeRow(c,false)).join('');
+}
+function codeRow(c,isMgrView){
+  const issuerTag=c.issuedByRole==='exec'?`<span class="tag t-pu">Exec</span>`:`<span class="tag t-mgr">${c.issuedByName||'Manager'}</span>`;
+  return `<tr>
     <td style="font-family:var(--font);font-weight:800;letter-spacing:.1em;color:${c.used?'var(--ink3)':'var(--purple)'}">${c.code}</td>
     <td>${c.staffName}${c.note?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">📝 ${c.note}</div>`:''}</td>
+    ${isMgrView?'':`<td>${issuerTag}</td>`}
     <td style="color:var(--ink3);font-size:12px">${c.generatedDate} ${c.generatedTime}</td>
     <td><span class="tag ${c.used?'t-used':'t-ok'}">${c.used?'✕ Used':'● Active'}</span></td>
     <td>${c.used?`<div style="font-size:12px"><div>${c.usedByName||'—'}</div><div style="color:var(--ink3);font-size:11px">${c.usedAt?new Date(c.usedAt).toLocaleString():''}</div></div>`:'—'}</td>
     <td>${!c.used?`<button class="btn btn-danger btn-xs" onclick="revokeCode('${c.id}')">Revoke</button>`:''}</td>
-  </tr>`).join('');
+  </tr>`;
 }
 function revokeCode(id){
   if(!confirm('Revoke this unused code? It will no longer work.'))return;
   DB.approvalCodes=DB.approvalCodes.filter(c=>c.id!==id);
-  save();renderCodesPage();updateBadges();toast('Code revoked.');
+  save();
+  if(session.role==='manager')renderMgrCodesPage();else renderExecCodesPage();
+  updateBadges();toast('Code revoked.');
 }
 
 // EXEC DASH
@@ -1010,18 +1149,17 @@ function renderExecDash(){
   const activeCodes=DB.approvalCodes.filter(c=>!c.used).length;
   document.getElementById('exec-stats').innerHTML=`
     <div class="sc"><div class="sl">Total Logs</div><div class="sv sv-ac">${DB.entries.length}</div><div class="ss">all time</div></div>
-    <div class="sc"><div class="sl">Active Staff</div><div class="sv sv-gr">${staffSet.size}</div><div class="ss">submitted at least once</div></div>
-    <div class="sc"><div class="sl">Total Hours</div><div class="sv sv-pu">${totH.toFixed(1)}</div><div class="ss">logged hours</div></div>
-    <div class="sc"><div class="sl">Clients Served</div><div class="sv sv-am">${clientSet.size}</div><div class="ss">unique clients</div></div>
-    <div class="sc"><div class="sl">Compliance Rate</div><div class="sv sv-gr">${compliance}%</div><div class="ss">on-time submissions</div></div>
-    <div class="sc"><div class="sl">Active Codes</div><div class="sv sv-pu">${activeCodes}</div><div class="ss">unused approval codes</div></div>`;
+    <div class="sc"><div class="sl">Active Staff</div><div class="sv sv-gr">${staffSet.size}</div><div class="ss">submitted ≥ once</div></div>
+    <div class="sc"><div class="sl">Total Hours</div><div class="sv sv-pu">${totH.toFixed(1)}</div><div class="ss">logged</div></div>
+    <div class="sc"><div class="sl">Clients</div><div class="sv sv-am">${clientSet.size}</div><div class="ss">served</div></div>
+    <div class="sc"><div class="sl">Compliance</div><div class="sv sv-gr">${compliance}%</div><div class="ss">on-time</div></div>
+    <div class="sc"><div class="sl">Active Codes</div><div class="sv sv-pu">${activeCodes}</div><div class="ss">unused</div></div>`;
   barChart('ebc-staff',staffHoursMap());
   barChart('ebc-client',clientHoursMap());
   const days=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
   const sc=DB.staffAccounts.length||1;
   document.getElementById('trend-tbl').innerHTML=`<table class="etbl"><thead><tr><th>Date</th><th>Entries</th><th>Hours</th><th>Submission Rate</th></tr></thead><tbody>${days.map(d=>{const de=DB.entries.filter(e=>e.date===d);const h=de.reduce((s,e)=>s+totalH(e),0).toFixed(1);const rate=Math.min(Math.round(de.length/sc*100),100);return `<tr><td>${d}</td><td>${de.length}</td><td>${h}h</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden"><div style="width:${rate}%;height:100%;background:var(--accent);border-radius:3px"></div></div><span style="font-size:12px;color:var(--ink3);width:34px">${rate}%</span></div></td></tr>`;}).join('')}</tbody></table>`;
 }
-
 function renderExecEntries(){
   const nf=document.getElementById('ef-name').value.toLowerCase();
   const cf=document.getElementById('ef-client').value;
@@ -1034,7 +1172,6 @@ function renderExecEntries(){
   });
   document.getElementById('exec-entries-list').innerHTML=data.length?data.map(e=>entryCard(e,false)).join(''):emptyState('📭','No entries found.');
 }
-
 function renderExecClients(){
   const map={};
   DB.entries.forEach(e=>(e.rows||[]).forEach(r=>{
@@ -1044,9 +1181,8 @@ function renderExecClients(){
   const sorted=Object.entries(map).sort((a,b)=>b[1].hours-a[1].hours);
   const el=document.getElementById('exec-client-data');
   if(!sorted.length){el.innerHTML=emptyState('📭','No data yet.');return;}
-  el.innerHTML=`<div class="sg">${sorted.map(([name,d])=>`<div class="sc"><div class="sl">${name}</div><div class="sv sv-ac">${d.hours.toFixed(1)}<span style="font-size:16px;color:var(--ink3)">h</span></div><div class="ss">${d.count} entries · ${d.staff.size} staff member${d.staff.size!==1?'s':''}</div></div>`).join('')}</div>`;
+  el.innerHTML=`<div class="sg">${sorted.map(([name,d])=>`<div class="sc"><div class="sl">${name}</div><div class="sv sv-ac">${d.hours.toFixed(1)}<span style="font-size:16px;color:var(--ink3)">h</span></div><div class="ss">${d.count} entries · ${d.staff.size} staff</div></div>`).join('')}</div>`;
 }
-
 function renderExecStaff(){
   const map={};
   DB.entries.forEach(e=>{
@@ -1064,11 +1200,13 @@ function renderExecStaff(){
 // CSV
 function exportCSV(){
   if(!DB.entries.length){toast('No entries to export.','err');return;}
-  const rows=[['Staff Name','Username','Date','Submitted At','Client','Hours','Tasks','General Notes','Status','Late Reason','Approval Code Used']];
+  const rows=[['Staff Name','Username','Date','Submitted At','Client','Hours','Tasks','General Notes','Status','Late Reason','Approval Code','Issued By']];
   DB.entries.forEach(e=>{
-    const codeUsed=e.usedCodeId?(DB.approvalCodes.find(c=>c.id===e.usedCodeId)||{}).code||'':'';
+    const code=e.usedCodeId?DB.approvalCodes.find(c=>c.id===e.usedCodeId):null;
+    const codeStr=code?code.code:'';
+    const issuer=code?(code.issuedByRole==='exec'?'Executive':code.issuedByName||'Manager'):'';
     (e.rows||[]).forEach(r=>{
-      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${codeUsed}"`]);
+      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${codeStr}"`,`"${issuer}"`]);
     });
   });
   const csv=rows.map(r=>r.join(',')).join('\n');
@@ -1094,14 +1232,16 @@ function fillClientFilter(id){
 }
 function updateBadges(){
   const myId=session.user?session.user.id||session.user.username:null;
-  const myCount=myId?DB.entries.filter(e=>e.staffId===myId).length:0;
+  const myCount=myId&&session.role==='staff'?DB.entries.filter(e=>e.staffId===myId).length:0;
   const lateCount=DB.entries.filter(e=>e.late).length;
   const total=DB.entries.length;
   const activeCodes=DB.approvalCodes.filter(c=>!c.used).length;
+  const mineCodes=myId?DB.approvalCodes.filter(c=>c.issuedById===myId&&!c.used).length:0;
   const bm=document.getElementById('b-mylog');if(bm)bm.textContent=myCount;
   const bM=document.getElementById('b-mgr');if(bM)bM.textContent=total;
   const bP=document.getElementById('b-pend');if(bP)bP.textContent=lateCount;
-  const bC=document.getElementById('b-codes');if(bC)bC.textContent=activeCodes;
+  const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
+  const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
 }
 function emptyState(icon,msg){return`<div style="text-align:center;padding:4rem 2rem;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">${icon}</div><p style="font-size:14px">${msg}</p></div>`;}
 function toast(msg,type=''){
