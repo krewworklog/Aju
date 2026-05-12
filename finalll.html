@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>WorkLog — Marketing Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800&family=Satoshi:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#0c0c0e;--s1:#131316;--s2:#1c1c21;--s3:#26262d;--s4:#30303a;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.11);
+  --ink:#f2f2f5;--ink2:#9999aa;--ink3:#55555f;
+  --accent:#4f6ef7;--accent-d:#3a56e0;--accent-g:rgba(79,110,247,0.15);--accent-b:rgba(79,110,247,0.08);
+  --green:#22c55e;--green-b:rgba(34,197,94,0.1);
+  --amber:#f59e0b;--amber-b:rgba(245,158,11,0.1);
+  --red:#ef4444;--red-b:rgba(239,68,68,0.1);
+  --purple:#a855f7;--purple-b:rgba(168,85,247,0.1);
+  --teal:#14b8a6;--teal-b:rgba(20,184,166,0.1);
+  --r:8px;--rl:14px;--rxl:20px;
+  --font:'Cabinet Grotesk',sans-serif;--body:'Satoshi',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:15px;-webkit-font-smoothing:antialiased;}
+body{font-family:var(--body);background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;}
+.screen{display:none;}
+.screen.active{display:flex;flex-direction:column;min-height:100vh;}
+
+/* SETUP SCREEN (config first run) */
+#screen-setup.active{align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 50% 50%,rgba(79,110,247,0.1),transparent 60%);}
+.setup-card{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rxl);padding:2.5rem;width:540px;max-width:95vw;box-shadow:0 32px 64px rgba(0,0,0,0.5);}
+.setup-h{font-family:var(--font);font-size:26px;font-weight:800;letter-spacing:-0.05em;margin-bottom:6px;}
+.setup-s{font-size:13px;color:var(--ink3);margin-bottom:1.5rem;line-height:1.6;}
+.setup-card ol{margin:0 0 1.5rem 1.25rem;padding:0;}
+.setup-card ol li{font-size:13px;color:var(--ink2);margin-bottom:6px;line-height:1.6;}
+.setup-card code{background:var(--s3);padding:2px 7px;border-radius:4px;font-size:12px;color:var(--accent);font-family:monospace;}
+
+/* LOGIN */
+#screen-login.active{align-items:center;justify-content:center;background:var(--bg);background-image:radial-gradient(ellipse at 20% 50%,rgba(79,110,247,0.07),transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(168,85,247,0.05),transparent 50%);}
+.login-card{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rxl);padding:2.5rem;width:420px;max-width:95vw;box-shadow:0 0 0 1px rgba(255,255,255,0.03),0 32px 64px rgba(0,0,0,0.5);}
+.login-brand{display:flex;align-items:center;gap:10px;margin-bottom:2rem;}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 4px 16px rgba(79,110,247,0.4);}
+.brand-name{font-family:var(--font);font-size:17px;font-weight:800;letter-spacing:-0.04em;}
+.login-h{font-family:var(--font);font-size:26px;font-weight:800;letter-spacing:-0.05em;margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--ink3);margin-bottom:1.75rem;line-height:1.5;}
+.tab-row{display:flex;background:var(--s2);border-radius:var(--r);padding:3px;gap:2px;margin-bottom:1.5rem;}
+.tab-btn{flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;background:none;color:var(--ink3);transition:all .15s;letter-spacing:-0.01em;}
+.tab-btn.active{background:var(--s4);color:var(--ink);}
+.lf{margin-bottom:1rem;}
+.lf label{display:block;font-size:12px;font-weight:500;color:var(--ink2);margin-bottom:6px;letter-spacing:.03em;}
+input,select,textarea{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:var(--r);color:var(--ink);font-family:var(--body);font-size:14px;padding:10px 13px;outline:none;transition:border-color .15s,box-shadow .15s;}
+input::placeholder,textarea::placeholder{color:var(--ink3);}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-b);}
+select option{background:var(--s2);}
+textarea{resize:vertical;line-height:1.6;}
+.login-err{font-size:12px;color:var(--red);margin-top:6px;display:none;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 18px;border-radius:var(--r);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .15s;letter-spacing:-0.01em;white-space:nowrap;}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 4px 16px rgba(79,110,247,0.3);}
+.btn-primary:hover{background:var(--accent-d);transform:translateY(-1px);box-shadow:0 6px 24px rgba(79,110,247,0.4);}
+.btn-primary:active{transform:translateY(0);}
+.btn-full{width:100%;padding:12px;font-size:14px;border-radius:var(--rl);}
+.btn-ghost{background:var(--s2);color:var(--ink2);border:1px solid var(--border2);}
+.btn-ghost:hover{background:var(--s3);color:var(--ink);}
+.btn-danger{background:var(--red-b);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.btn-danger:hover{background:var(--red);color:#fff;}
+.btn-sm{padding:6px 11px;font-size:12px;}
+.btn-xs{padding:4px 9px;font-size:11px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none;}
+
+/* LOADING OVERLAY */
+.loading-bar{position:fixed;top:0;left:0;right:0;height:3px;background:var(--accent);z-index:9999;animation:lb 1.2s infinite;display:none;}
+.loading-bar.show{display:block;}
+@keyframes lb{0%{transform:translateX(-100%);}100%{transform:translateX(100%);}}
+
+/* APP */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:52px;background:var(--s1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200;}
+.topbar-l{display:flex;align-items:center;gap:14px;}
+.topbar-brand{font-family:var(--font);font-size:15px;font-weight:800;letter-spacing:-0.04em;}
+.role-chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.04em;text-transform:uppercase;}
+.chip-staff{background:var(--accent-g);color:var(--accent);}
+.chip-manager{background:var(--green-b);color:var(--green);}
+.chip-exec{background:var(--purple-b);color:var(--purple);}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
+.sync-dot.syncing{background:var(--amber);animation:p 1s infinite;}
+.sync-dot.error{background:var(--red);}
+.topbar-r{display:flex;align-items:center;gap:10px;}
+.clock-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--s2);font-size:13px;font-family:var(--font);font-weight:700;letter-spacing:.02em;}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:p 2s infinite;}
+.pulse.red{background:var(--red);}
+.pulse.amber{background:var(--amber);}
+@keyframes p{0%,100%{opacity:1;}50%{opacity:.3;}}
+.dl-chip{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;font-family:var(--font);}
+.dl-ok{background:var(--green-b);color:var(--green);}
+.dl-late{background:var(--amber-b);color:var(--amber);}
+.dl-closed{background:var(--red-b);color:var(--red);}
+.user-btn{display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;border-radius:20px;border:1px solid var(--border2);background:var(--s2);cursor:pointer;font-size:13px;transition:background .12s;}
+.user-btn:hover{background:var(--s3);}
+.avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;font-family:var(--font);}
+.av-staff{background:var(--accent-g);color:var(--accent);}
+.av-manager{background:var(--green-b);color:var(--green);}
+.av-exec{background:var(--purple-b);color:var(--purple);}
+
+.app-body{display:flex;flex:1;}
+.sidebar{width:216px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--border);padding:.875rem .75rem;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;}
+.sbl{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);padding:0 8px;margin:12px 0 4px;}
+.sbl:first-child{margin-top:0;}
+.nav{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r);cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;color:var(--ink2);transition:all .12s;border:1px solid transparent;user-select:none;letter-spacing:-0.01em;}
+.nav:hover{background:var(--s2);color:var(--ink);}
+.nav.active{background:var(--accent-g);color:var(--accent);border-color:rgba(79,110,247,.2);}
+.nav-ic{font-size:15px;width:20px;text-align:center;}
+.nbadge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;min-width:20px;text-align:center;}
+.nbadge.amber{background:var(--amber);}
+.nbadge.red{background:var(--red);}
+.nbadge.purple{background:var(--purple);}
+
+.content{flex:1;padding:2rem;overflow-y:auto;max-height:calc(100vh - 52px);}
+.page{display:none;}
+.page.active{display:block;animation:fu .2s ease;}
+@keyframes fu{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.75rem;flex-wrap:wrap;gap:12px;}
+.pt{font-family:var(--font);font-size:22px;font-weight:800;letter-spacing:-0.05em;}
+.ps{font-size:13px;color:var(--ink3);margin-top:3px;line-height:1.5;}
+
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.75rem;}
+.sc{background:var(--s1);border:1px solid var(--border);border-radius:var(--rl);padding:1.25rem;}
+.sl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink3);margin-bottom:8px;}
+.sv{font-family:var(--font);font-size:30px;font-weight:800;letter-spacing:-0.06em;line-height:1;}
+.sv-ac{color:var(--accent);}.sv-gr{color:var(--green);}.sv-am{color:var(--amber);}.sv-re{color:var(--red);}.sv-pu{color:var(--purple);}.sv-te{color:var(--teal);}
+.ss{font-size:12px;color:var(--ink3);margin-top:5px;}
+
+.card{background:var(--s1);border:1px solid var(--border);border-radius:var(--rl);padding:1.5rem;margin-bottom:1rem;}
+.ct{font-family:var(--font);font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-bottom:1rem;}
+
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.f{display:flex;flex-direction:column;gap:6px;}
+.f label{font-size:12px;font-weight:500;color:var(--ink2);letter-spacing:.02em;}
+.f.full{grid-column:1/-1;}
+.ferr{font-size:12px;color:var(--red);margin-top:4px;display:none;}
+
+.ce-wrap{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
+.ce-row{background:var(--s2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.25rem;}
+.ce-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.ce-num{font-family:var(--font);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);}
+.ce-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ce-grid .f.full{grid-column:1/-1;}
+.add-ce-btn{display:flex;align-items:center;gap:8px;padding:11px 16px;border:1.5px dashed var(--border2);border-radius:var(--rl);cursor:pointer;color:var(--ink3);font-size:13px;font-family:var(--font);font-weight:700;transition:all .15s;background:none;width:100%;}
+.add-ce-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-b);}
+
+.appr-box{background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,.22);border-radius:var(--rl);padding:1.25rem 1.5rem;margin-bottom:1rem;display:none;}
+.appr-box.show{display:block;animation:fu .2s ease;}
+.appr-box.closed{background:rgba(239,68,68,0.07);border-color:rgba(239,68,68,.22);}
+.appr-t{display:flex;align-items:center;gap:8px;font-family:var(--font);font-size:14px;font-weight:800;color:var(--amber);margin-bottom:4px;}
+.appr-box.closed .appr-t{color:var(--red);}
+.appr-s{font-size:13px;color:rgba(245,158,11,.8);margin-bottom:14px;line-height:1.5;}
+
+.tag{display:inline-flex;align-items:center;gap:4px;font-family:var(--font);font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.03em;}
+.t-ok{background:var(--green-b);color:var(--green);}
+.t-late{background:var(--amber-b);color:var(--amber);}
+.t-pend{background:var(--red-b);color:var(--red);}
+.t-cl{background:var(--accent-g);color:var(--accent);}
+.t-pu{background:var(--purple-b);color:var(--purple);}
+.t-used{background:var(--s3);color:var(--ink3);}
+.t-mgr{background:var(--green-b);color:var(--green);}
+
+.ec{background:var(--s1);border:1px solid var(--border);border-radius:var(--rl);padding:1.25rem;margin-bottom:10px;}
+.ec-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:10px;}
+.ec-name{font-family:var(--font);font-size:16px;font-weight:800;letter-spacing:-0.03em;}
+.ec-un{font-size:12px;color:var(--ink3);margin-top:2px;}
+.ec-meta{display:flex;gap:10px;font-size:12px;color:var(--ink3);flex-wrap:wrap;margin-bottom:10px;}
+.ec-rows{display:flex;flex-direction:column;gap:8px;}
+.ecr{background:var(--s2);border-radius:var(--r);padding:10px 14px;}
+.ecr-cl{font-family:var(--font);font-size:13px;font-weight:800;color:var(--accent);margin-bottom:4px;}
+.ecr-tasks{font-size:13px;color:var(--ink2);line-height:1.5;}
+.ecr-h{font-size:12px;color:var(--ink3);margin-top:4px;}
+.ec-notes{font-size:13px;color:var(--ink3);margin-top:8px;font-style:italic;}
+.ec-reason{font-size:13px;color:var(--amber);background:var(--amber-b);padding:8px 12px;border-radius:var(--r);margin-top:8px;}
+.ec-acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+
+.bc{display:flex;flex-direction:column;gap:10px;}
+.bcr{display:flex;align-items:center;gap:10px;}
+.bcl{font-size:12px;color:var(--ink2);width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;}
+.bct{flex:1;height:7px;background:var(--s3);border-radius:4px;overflow:hidden;}
+.bcf{height:100%;border-radius:4px;background:var(--accent);transition:width .6s ease;}
+.bcv{font-size:12px;color:var(--ink3);width:38px;text-align:right;font-family:var(--font);font-weight:700;}
+
+.stbl,.etbl{width:100%;border-collapse:collapse;font-size:13px;}
+.stbl th,.etbl th{text-align:left;font-family:var(--font);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:8px 12px;border-bottom:1px solid var(--border2);}
+.stbl td,.etbl td{padding:10px 12px;border-bottom:1px solid var(--border);}
+.stbl tr:hover td,.etbl tr:hover td{background:var(--s2);}
+
+.filters{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;}
+.filters input,.filters select{flex:1;min-width:130px;padding:8px 11px;font-size:13px;}
+
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+.modal-ov.show{display:flex;}
+.modal{background:var(--s1);border:1px solid var(--border2);border-radius:var(--rxl);padding:2rem;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-t{font-family:var(--font);font-size:18px;font-weight:800;letter-spacing:-0.04em;margin-bottom:4px;}
+.modal-s{font-size:13px;color:var(--ink3);margin-bottom:1.5rem;line-height:1.5;}
+.modal-ft{display:flex;gap:8px;justify-content:flex-end;margin-top:1.5rem;}
+
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(120px);background:var(--s4);color:var(--ink);border:1px solid var(--border2);padding:11px 22px;border-radius:30px;font-size:13px;font-weight:700;font-family:var(--font);z-index:1000;transition:transform .35s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;pointer-events:none;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.ok{background:var(--green);color:#0a1a0f;border-color:transparent;}
+.toast.err{background:var(--red);color:#fff;border-color:transparent;}
+
+.cmgr-list{list-style:none;margin-bottom:1rem;}
+.cmgr-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:var(--r);margin-bottom:6px;background:var(--s2);border:1px solid var(--border);font-size:14px;}
+.del-ic{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:15px;padding:4px 7px;border-radius:6px;}
+.del-ic:hover{background:var(--red-b);color:var(--red);}
+.add-row{display:flex;gap:8px;}
+.add-row input{flex:1;}
+
+.code-display{background:linear-gradient(135deg,var(--purple-b),var(--accent-b));border:1px solid rgba(168,85,247,.3);border-radius:var(--rl);padding:1.5rem 2rem;margin:1rem 0;text-align:center;position:relative;}
+.code-display-label{font-family:var(--font);font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--purple);margin-bottom:8px;}
+.code-display-value{font-family:var(--font);font-size:42px;font-weight:800;letter-spacing:.15em;color:var(--ink);margin-bottom:4px;}
+.code-display-sub{font-size:12px;color:var(--ink3);margin-top:6px;}
+.copy-btn{position:absolute;top:1rem;right:1rem;background:var(--s3);border:1px solid var(--border2);color:var(--ink2);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;font-family:var(--font);font-weight:700;}
+
+.info-banner{background:var(--accent-b);border:1px solid rgba(79,110,247,.2);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--accent);margin-bottom:1rem;display:flex;align-items:flex-start;gap:8px;}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--s4);border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="loading-bar" id="loading-bar"></div>
+
+<!-- SETUP SCREEN (first run only) -->
+<div class="screen" id="screen-setup">
+  <div class="setup-card">
+    <div class="login-brand"><div class="brand-mark">⚙</div><span class="brand-name">WorkLog Setup</span></div>
+    <div class="setup-h">Connect to Google Sheets</div>
+    <p class="setup-s">Paste your Google Apps Script Web App URL below. This is a one-time setup per device — it'll be remembered after.</p>
+    <div class="lf">
+      <label>Web App URL *</label>
+      <input type="text" id="setup-url" placeholder="https://script.google.com/macros/s/.../exec"/>
+    </div>
+    <div class="login-err" id="setup-err">Could not connect. Check the URL and that the script is deployed with "Anyone" access.</div>
+    <button class="btn btn-primary btn-full" onclick="saveBackendUrl()">Connect →</button>
+    <p style="font-size:12px;color:var(--ink3);margin-top:1rem;text-align:center">Don't have a script URL yet? See the setup instructions provided with this app.</p>
+  </div>
+</div>
+
+<!-- LOGIN SCREEN -->
+<div class="screen" id="screen-login">
+  <div class="login-card">
+    <div class="login-brand"><div class="brand-mark">📋</div><span class="brand-name">WorkLog</span></div>
+    <div class="login-h">Sign in</div>
+    <p class="login-sub">Marketing team work log portal. Select your role to continue.</p>
+    <div class="tab-row">
+      <button class="tab-btn active" onclick="setLoginRole('staff',this)">Staff</button>
+      <button class="tab-btn" onclick="setLoginRole('manager',this)">Manager</button>
+      <button class="tab-btn" onclick="setLoginRole('exec',this)">Executive</button>
+    </div>
+    <div id="login-staff">
+      <div class="lf"><label>Username</label><input id="l-username" placeholder="Enter your username" autocomplete="username"/></div>
+      <div class="lf"><label>Password</label><input type="password" id="l-password" placeholder="Enter your password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    </div>
+    <div id="login-manager" style="display:none">
+      <div class="lf"><label>Username</label><input id="lm-username" placeholder="Manager username" autocomplete="username"/></div>
+      <div class="lf"><label>Password</label><input type="password" id="lm-password" placeholder="Manager password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    </div>
+    <div id="login-exec" style="display:none">
+      <div class="lf"><label>Executive Password</label><input type="password" id="l-execcode" placeholder="Enter executive password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    </div>
+    <div class="login-err" id="l-err">Incorrect credentials. Please try again.</div>
+    <button class="btn btn-primary btn-full" style="margin-top:.75rem" onclick="doLogin()">Sign In →</button>
+    <p style="font-size:11px;color:var(--ink3);margin-top:1rem;text-align:center"><a href="#" onclick="resetBackend();return false" style="color:var(--ink3)">⚙ Reconfigure backend</a></p>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div class="screen" id="screen-app">
+  <header class="topbar">
+    <div class="topbar-l">
+      <span class="topbar-brand">WorkLog</span>
+      <span class="role-chip" id="role-chip">Staff</span>
+      <span class="sync-dot" id="sync-dot" title="Synced with Google Sheets"></span>
+    </div>
+    <div class="topbar-r">
+      <div class="clock-badge"><div class="pulse" id="cdot"></div><span id="clock">--:--</span></div>
+      <span class="dl-chip dl-ok" id="dl-chip">--</span>
+      <button class="btn btn-ghost btn-sm" onclick="syncAll()" title="Refresh from Sheets">🔄</button>
+      <div class="user-btn" onclick="logout()">
+        <div class="avatar av-staff" id="top-av">?</div>
+        <span id="top-name" style="font-size:13px;font-weight:500">User</span>
+        <span style="font-size:11px;color:var(--ink3)">Sign out</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="sidebar">
+      <div id="sb-staff" style="display:none">
+        <div class="sbl">My Work</div>
+        <div class="nav active" onclick="gp('log',this)"><span class="nav-ic">✏️</span>Log Work</div>
+        <div class="nav" onclick="gp('my-logs',this)"><span class="nav-ic">📄</span>My Logs<span class="nbadge" id="b-mylog">0</span></div>
+      </div>
+      <div id="sb-manager" style="display:none">
+        <div class="sbl">Dashboard</div>
+        <div class="nav active" onclick="gp('mgr-dash',this)"><span class="nav-ic">📊</span>Overview</div>
+        <div class="nav" onclick="gp('mgr-entries',this)"><span class="nav-ic">📄</span>All Entries<span class="nbadge" id="b-mgr">0</span></div>
+        <div class="nav" onclick="gp('mgr-late',this)"><span class="nav-ic">⏳</span>Late Submissions<span class="nbadge amber" id="b-pend">0</span></div>
+        <div class="sbl">Approvals</div>
+        <div class="nav" onclick="gp('mgr-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-mgr-codes">0</span></div>
+        <div class="sbl">Settings</div>
+        <div class="nav" onclick="gp('mgr-staff',this)"><span class="nav-ic">👥</span>Staff Accounts</div>
+        <div class="nav" onclick="gp('mgr-clients',this)"><span class="nav-ic">🏢</span>Clients</div>
+      </div>
+      <div id="sb-exec" style="display:none">
+        <div class="sbl">Executive</div>
+        <div class="nav active" onclick="gp('exec-dash',this)"><span class="nav-ic">🏛</span>Overview</div>
+        <div class="nav" onclick="gp('exec-entries',this)"><span class="nav-ic">📋</span>All Logs</div>
+        <div class="nav" onclick="gp('exec-clients',this)"><span class="nav-ic">📈</span>By Client</div>
+        <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
+        <div class="sbl">Approvals</div>
+        <div class="nav" onclick="gp('exec-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-exec-codes">0</span></div>
+        <div class="sbl">Settings</div>
+        <div class="nav" onclick="gp('exec-managers',this)"><span class="nav-ic">🛡</span>Manager Accounts</div>
+        <div class="nav" onclick="gp('exec-passwd',this)"><span class="nav-ic">🔑</span>Executive Password</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <!-- STAFF: LOG WORK -->
+      <div class="page active" id="page-log">
+        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Add one or more client entries for today. Submit before 6:30 PM.</p></div></div>
+        <div class="card"><div class="ct">Session Info</div><div class="fg">
+          <div class="f"><label>Date *</label><input type="date" id="f-date"/></div>
+          <div class="f"><label>Staff Name</label><input type="text" id="f-sname" readonly style="opacity:.6"/></div>
+        </div></div>
+        <div class="card"><div class="ct">Client Entries</div>
+          <div class="ce-wrap" id="ce-wrap"></div>
+          <button class="add-ce-btn" onclick="addCE()">＋ Add Another Client Entry</button>
+        </div>
+        <div class="card"><div class="ct">General Notes</div>
+          <div class="f"><textarea id="f-gnotes" placeholder="Any overall notes for today..." style="min-height:65px"></textarea></div>
+        </div>
+        <div class="appr-box" id="appr-box">
+          <div class="appr-t" id="appr-title">⚠ Late Submission — Approval Code Required</div>
+          <div class="appr-s" id="appr-text">It is past 6:30 PM. Submitting now requires a one-time code from a manager (before 9 PM) or an executive.</div>
+          <div class="fg">
+            <div class="f full"><label style="color:var(--amber)">Reason for Delay *</label><textarea id="f-reason" style="min-height:70px;border-color:rgba(245,158,11,.35)" placeholder="Explain why you are submitting late..."></textarea></div>
+            <div class="f full"><label style="color:var(--amber)">One-Time Approval Code *</label><input type="text" id="f-apprcode" style="border-color:rgba(245,158,11,.35);font-family:var(--font);font-size:18px;letter-spacing:.2em;text-align:center;font-weight:800" placeholder="XXXX-XXXX" maxlength="9"/><div class="ferr" id="appr-err"></div></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" style="flex:1;padding:12px;font-size:14px;border-radius:var(--rl)" onclick="submitLog()" id="submit-btn">✔ Submit Work Log</button>
+          <button class="btn btn-ghost" onclick="cancelEdit()" id="cancel-btn" style="display:none">Cancel</button>
+        </div>
+      </div>
+
+      <!-- STAFF: MY LOGS -->
+      <div class="page" id="page-my-logs">
+        <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit any log before 6:30 PM.</p></div></div>
+        <div id="my-logs-list"></div>
+      </div>
+
+      <!-- MANAGER: OVERVIEW -->
+      <div class="page" id="page-mgr-dash">
+        <div class="ph"><div><div class="pt">Manager Dashboard</div><p class="ps">Team performance at a glance.</p></div><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
+        <div class="sg" id="mgr-stats"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div class="card"><div class="ct">Hours by Staff</div><div class="bc" id="bc-staff"></div></div>
+          <div class="card"><div class="ct">Hours by Client</div><div class="bc" id="bc-client"></div></div>
+        </div>
+        <div class="card"><div class="ct">Today's Submissions</div><div id="today-list"></div></div>
+      </div>
+
+      <!-- MANAGER: ALL ENTRIES -->
+      <div class="page" id="page-mgr-entries">
+        <div class="ph"><div><div class="pt">All Entries</div><p class="ps">Every submitted work log across the team.</p></div><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
+        <div class="filters">
+          <input type="text" id="mf-name" placeholder="Search name..." oninput="renderMgrEntries()"/>
+          <select id="mf-client" onchange="renderMgrEntries()"><option value="">All clients</option></select>
+          <select id="mf-status" onchange="renderMgrEntries()"><option value="">All statuses</option><option value="ontime">On time</option><option value="late">Late</option></select>
+          <input type="date" id="mf-date" onchange="renderMgrEntries()"/>
+        </div>
+        <div id="mgr-entries-list"></div>
+      </div>
+
+      <!-- MANAGER: LATE -->
+      <div class="page" id="page-mgr-late">
+        <div class="ph"><div><div class="pt">Late Submissions</div><p class="ps">Entries submitted after deadline using approval codes.</p></div></div>
+        <div id="late-list"></div>
+      </div>
+
+      <!-- MANAGER: CODES -->
+      <div class="page" id="page-mgr-codes">
+        <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 6:30 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
+        <div id="mgr-code-window-info"></div>
+        <div class="sg" id="mgr-codes-stats"></div>
+        <div class="card"><div class="ct">Codes Issued by You</div>
+          <table class="etbl"><thead><tr><th>Code</th><th>For Staff</th><th>Generated</th><th>Status</th><th>Used By</th><th>Actions</th></tr></thead><tbody id="mgr-codes-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <!-- MANAGER: STAFF -->
+      <div class="page" id="page-mgr-staff">
+        <div class="ph"><div><div class="pt">Staff Accounts</div><p class="ps">Create and manage staff login credentials.</p></div><button class="btn btn-primary btn-sm" onclick="openNewStaffModal()">＋ Add Staff</button></div>
+        <div class="card"><table class="stbl"><thead><tr><th>Name</th><th>Username</th><th>Created</th><th>Entries</th><th>Actions</th></tr></thead><tbody id="staff-tbody"></tbody></table></div>
+      </div>
+
+      <!-- MANAGER: CLIENTS -->
+      <div class="page" id="page-mgr-clients">
+        <div class="ph"><div><div class="pt">Manage Clients</div><p class="ps">Add or remove clients.</p></div></div>
+        <div class="card"><div class="ct">Client List</div>
+          <ul class="cmgr-list" id="client-list"></ul>
+          <div class="add-row"><input type="text" id="new-client" placeholder="New client name..." onkeydown="if(event.key==='Enter')addClient()"/><button class="btn btn-ghost" onclick="addClient()">＋ Add</button></div>
+        </div>
+      </div>
+
+      <!-- EXEC: OVERVIEW -->
+      <div class="page" id="page-exec-dash">
+        <div class="ph"><div><div class="pt">Executive Overview</div><p class="ps">High-level team performance summary.</p></div><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
+        <div class="sg" id="exec-stats"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div class="card"><div class="ct">Top Staff by Hours</div><div class="bc" id="ebc-staff"></div></div>
+          <div class="card"><div class="ct">Top Clients by Hours</div><div class="bc" id="ebc-client"></div></div>
+        </div>
+        <div class="card"><div class="ct">7-Day Submission Trend</div><div id="trend-tbl"></div></div>
+      </div>
+
+      <!-- EXEC: ALL LOGS -->
+      <div class="page" id="page-exec-entries">
+        <div class="ph"><div><div class="pt">All Work Logs</div><p class="ps">Full visibility across every submission.</p></div><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
+        <div class="filters">
+          <input type="text" id="ef-name" placeholder="Search name..." oninput="renderExecEntries()"/>
+          <select id="ef-client" onchange="renderExecEntries()"><option value="">All clients</option></select>
+          <input type="date" id="ef-date" onchange="renderExecEntries()"/>
+        </div>
+        <div id="exec-entries-list"></div>
+      </div>
+
+      <div class="page" id="page-exec-clients">
+        <div class="ph"><div><div class="pt">Client Analytics</div><p class="ps">Hours per client.</p></div></div>
+        <div id="exec-client-data"></div>
+      </div>
+
+      <div class="page" id="page-exec-staff">
+        <div class="ph"><div><div class="pt">Staff Analytics</div><p class="ps">Individual performance.</p></div></div>
+        <div id="exec-staff-data"></div>
+      </div>
+
+      <!-- EXEC: CODES -->
+      <div class="page" id="page-exec-codes">
+        <div class="ph"><div><div class="pt">All Approval Codes</div><p class="ps">Executive can generate codes anytime.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('exec')">＋ Generate New Code</button></div>
+        <div class="sg" id="exec-codes-stats"></div>
+        <div class="card"><div class="ct">All Generated Codes</div>
+          <table class="etbl"><thead><tr><th>Code</th><th>For Staff</th><th>Issued By</th><th>Generated</th><th>Status</th><th>Used By</th><th>Actions</th></tr></thead><tbody id="exec-codes-tbody"></tbody></table>
+        </div>
+      </div>
+
+      <!-- EXEC: MANAGER ACCOUNTS -->
+      <div class="page" id="page-exec-managers">
+        <div class="ph"><div><div class="pt">Manager Accounts</div><p class="ps">Create and manage individual manager logins.</p></div><button class="btn btn-primary btn-sm" onclick="openNewManagerModal()">＋ Add Manager</button></div>
+        <div class="card"><table class="stbl"><thead><tr><th>Name</th><th>Username</th><th>Created</th><th>Codes Issued</th><th>Actions</th></tr></thead><tbody id="mgr-acct-tbody"></tbody></table></div>
+      </div>
+
+      <!-- EXEC: PASSWORD -->
+      <div class="page" id="page-exec-passwd">
+        <div class="ph"><div><div class="pt">Executive Password</div><p class="ps">Update the executive sign-in password.</p></div></div>
+        <div class="card"><div class="ct">Change Password</div>
+          <div class="fg">
+            <div class="f"><label>Current Password *</label><input type="password" id="ep-cur"/></div>
+            <div class="f"><label>New Password *</label><input type="password" id="ep-new"/></div>
+            <div class="f"><label>Confirm New *</label><input type="password" id="ep-con"/></div>
+          </div>
+          <div class="ferr" id="ep-err" style="display:block;margin-top:8px"></div>
+          <button class="btn btn-ghost" style="margin-top:14px" onclick="changeExecCode()">Update Password</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-ov" id="staff-modal">
+  <div class="modal">
+    <div class="modal-t">Add Staff Account</div>
+    <p class="modal-s">Create login credentials for a new staff member.</p>
+    <div class="fg">
+      <div class="f full"><label>Full Name *</label><input type="text" id="sm-name" placeholder="e.g. Sarah Ahmed"/></div>
+      <div class="f"><label>Username *</label><input type="text" id="sm-user" placeholder="e.g. sarah.ahmed"/></div>
+      <div class="f"><label>Password *</label><input type="password" id="sm-pass"/></div>
+    </div>
+    <div class="ferr" id="sm-err" style="display:block;margin-top:8px"></div>
+    <div class="modal-ft"><button class="btn btn-ghost" onclick="closeModal('staff-modal')">Cancel</button><button class="btn btn-primary" onclick="saveStaff()">Save Account</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="manager-modal">
+  <div class="modal">
+    <div class="modal-t">Add Manager Account</div>
+    <p class="modal-s">Create login credentials for a new manager.</p>
+    <div class="fg">
+      <div class="f full"><label>Full Name *</label><input type="text" id="mm-name"/></div>
+      <div class="f"><label>Username *</label><input type="text" id="mm-user"/></div>
+      <div class="f"><label>Password *</label><input type="password" id="mm-pass"/></div>
+    </div>
+    <div class="ferr" id="mm-err" style="display:block;margin-top:8px"></div>
+    <div class="modal-ft"><button class="btn btn-ghost" onclick="closeModal('manager-modal')">Cancel</button><button class="btn btn-primary" onclick="saveManager()">Save Account</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="reset-modal">
+  <div class="modal">
+    <div class="modal-t">Reset Password</div>
+    <p class="modal-s" id="reset-modal-s">Set a new password.</p>
+    <div class="f" style="margin-bottom:1rem"><label>New Password *</label><input type="password" id="rm-pass"/></div>
+    <div class="ferr" id="rm-err" style="display:block;margin-top:8px"></div>
+    <div class="modal-ft"><button class="btn btn-ghost" onclick="closeModal('reset-modal')">Cancel</button><button class="btn btn-primary" onclick="doResetPass()">Reset Password</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="gen-code-modal">
+  <div class="modal">
+    <div id="gen-step1">
+      <div class="modal-t">Generate Approval Code</div>
+      <p class="modal-s">Create a one-time code for a staff member.</p>
+      <div class="fg">
+        <div class="f full"><label>For Staff Member *</label><select id="gc-staff"><option value="">— Select staff —</option></select></div>
+        <div class="f full"><label>Note (optional)</label><input type="text" id="gc-note"/></div>
+      </div>
+      <div class="modal-ft"><button class="btn btn-ghost" onclick="closeModal('gen-code-modal')">Cancel</button><button class="btn btn-primary" onclick="generateCode()">Generate Code</button></div>
+    </div>
+    <div id="gen-step2" style="display:none">
+      <div class="modal-t">Code Generated ✓</div>
+      <p class="modal-s">Share this code with the staff member.</p>
+      <div class="code-display">
+        <button class="copy-btn" onclick="copyCode()">📋 Copy</button>
+        <div class="code-display-label">One-Time Code</div>
+        <div class="code-display-value" id="gen-code-value">XXXX-XXXX</div>
+        <div class="code-display-sub">For: <strong id="gen-code-for"></strong></div>
+      </div>
+      <div class="modal-ft"><button class="btn btn-primary" onclick="closeModal('gen-code-modal')">Done</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════
+//  BACKEND CONFIG
+// ════════════════════════════════════════
+let BACKEND_URL = 'https://script.google.com/macros/s/AKfycbxOCv7kqFcMVdsw4MEbFV_VQSZlSQ5fkonq0qcs11ZDwsoknohpaEpf5Y1c4RyJLTft/exec';
+
+function showLoading(yes){document.getElementById('loading-bar').classList.toggle('show',yes);}
+function setSyncStatus(s){const d=document.getElementById('sync-dot');if(!d)return;d.className='sync-dot'+(s?' '+s:'');}
+
+async function api(action, data={}) {
+  if(!BACKEND_URL) throw new Error('No backend URL configured');
+  showLoading(true); setSyncStatus('syncing');
+  const params = new URLSearchParams();
+  params.append('action', action);
+  for(const k in data){
+    const v = data[k];
+    params.append(k, typeof v === 'object' ? JSON.stringify(v) : v);
+  }
+  try {
+    const res = await fetch(BACKEND_URL + '?' + params.toString());
+    const json = await res.json();
+    if(json.error) throw new Error(json.error);
+    setSyncStatus('');
+    return json;
+  } catch(err){
+    setSyncStatus('error');
+    throw err;
+  } finally {
+    showLoading(false);
+  }
+}
+
+// First-run: backend URL check
+function init(){
+  if(!BACKEND_URL){
+    document.getElementById('screen-setup').classList.add('active');
+  } else {
+    document.getElementById('screen-login').classList.add('active');
+    setSyncStatus('');
+  }
+}
+async function saveBackendUrl(){
+  const url=document.getElementById('setup-url').value.trim();
+  const err=document.getElementById('setup-err');err.style.display='none';
+  if(!url || !url.startsWith('https://script.google.com')){
+    err.textContent='Please paste a valid Google Apps Script URL ending in /exec.';
+    err.style.display='block';return;
+  }
+  // Test the URL
+  try {
+    showLoading(true);
+    const res = await fetch(url + '?action=getAll');
+    const json = await res.json();
+    if(json.error) throw new Error(json.error);
+    BACKEND_URL = url;
+    localStorage.setItem('wl_backend_url', url);
+    document.getElementById('screen-setup').classList.remove('active');
+    document.getElementById('screen-login').classList.add('active');
+    toast('Connected to Google Sheets ✓','ok');
+  } catch(e){
+    err.textContent='Could not reach the script. Make sure it\'s deployed with "Anyone" access. Error: '+e.message;
+    err.style.display='block';
+  } finally { showLoading(false); }
+}
+function resetBackend(){
+  if(!confirm('Reconfigure backend? You\'ll need to enter the script URL again.'))return;
+  localStorage.removeItem('wl_backend_url');
+  location.reload();
+}
+
+// ════════════════════════════════════════
+//  STATE (mirror of sheet data)
+// ════════════════════════════════════════
+let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], execCode:'99999' };
+let session = { user:null, role:null };
+let editingId = null;
+let ceCount = 0;
+let resetTarget = null;
+let loginRole = 'staff';
+let lastGeneratedCode = null;
+let genCodeContext = null;
+
+async function syncAll(){
+  try {
+    const data = await api('getAll');
+    DB = data;
+    updateBadges();
+    // Re-render current page if app is open
+    if(document.getElementById('screen-app').classList.contains('active')){
+      const activePage = document.querySelector('.page.active');
+      if(activePage){
+        const pageId = activePage.id.replace('page-','');
+        const el = document.querySelector(`.nav.active`);
+        gp(pageId, el);
+      }
+    }
+    toast('Synced.','ok');
+  } catch(e){
+    toast('Sync failed: '+e.message,'err');
+  }
+}
+
+// ════════════════════════════════════════
+//  TIME WINDOWS
+// ════════════════════════════════════════
+function pad(n){return String(n).padStart(2,'0');}
+function todayStr(){return new Date().toISOString().slice(0,10);}
+function nowTime(){const n=new Date();return `${pad(n.getHours())}:${pad(n.getMinutes())}`;}
+function timeWindow(){
+  const n=new Date();const mins=n.getHours()*60+n.getMinutes();
+  if(mins < 18*60+30) return 'open';
+  if(mins < 21*60) return 'manager';
+  return 'exec';
+}
+function isLate(){return timeWindow()!=='open';}
+function canManagerIssueCodes(){return timeWindow()==='manager';}
+
+function updateClock(){
+  const n=new Date();
+  const clEl=document.getElementById('clock');if(!clEl)return;
+  clEl.textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
+  const win=timeWindow();
+  const cdot=document.getElementById('cdot');
+  const dc=document.getElementById('dl-chip');
+  if(win==='open'){
+    cdot.className='pulse';
+    const rem=(18*60+30)-(n.getHours()*60+n.getMinutes());
+    dc.className='dl-chip dl-ok';dc.textContent=`${Math.floor(rem/60)}h ${rem%60}m to deadline`;
+  } else if(win==='manager'){
+    cdot.className='pulse amber';
+    const rem=(21*60)-(n.getHours()*60+n.getMinutes());
+    dc.className='dl-chip dl-late';dc.textContent=`Late · Manager window (${Math.floor(rem/60)}h ${rem%60}m left)`;
+  } else {
+    cdot.className='pulse red';
+    dc.className='dl-chip dl-closed';dc.textContent='Executive approval only';
+  }
+  const ab=document.getElementById('appr-box');
+  if(ab){
+    ab.className='appr-box'+(win!=='open'?' show':'')+(win==='exec'?' closed':'');
+    const at=document.getElementById('appr-title');
+    const atx=document.getElementById('appr-text');
+    if(win==='manager'&&at){
+      at.textContent='⚠ Late Submission — Approval Code Required';
+      atx.textContent='It is past 6:30 PM. A manager or executive can issue a one-time approval code. Request one and enter it below.';
+    } else if(win==='exec'&&at){
+      at.textContent='⛔ Late Submission — Executive Approval Only';
+      atx.textContent='It is past 9:00 PM. Only an executive can issue a code now.';
+    }
+  }
+}
+setInterval(updateClock,15000);
+
+// ════════════════════════════════════════
+//  LOGIN
+// ════════════════════════════════════════
+function setLoginRole(role,el){
+  loginRole=role;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('l-err').style.display='none';
+  document.getElementById('login-staff').style.display=role==='staff'?'block':'none';
+  document.getElementById('login-manager').style.display=role==='manager'?'block':'none';
+  document.getElementById('login-exec').style.display=role==='exec'?'block':'none';
+}
+async function doLogin(){
+  const err=document.getElementById('l-err');err.style.display='none';
+  try {
+    await syncAll();
+  } catch(e){ err.textContent='Could not connect to server. Check your network.';err.style.display='block';return; }
+  if(loginRole==='staff'){
+    const u=document.getElementById('l-username').value.trim();
+    const p=document.getElementById('l-password').value.trim();
+    const a=DB.staff.find(a=>String(a.username).toLowerCase()===u.toLowerCase()&&String(a.password)===p);
+    if(!a){err.style.display='block';return;}
+    session={user:a,role:'staff'};
+  }else if(loginRole==='manager'){
+    const u=document.getElementById('lm-username').value.trim();
+    const p=document.getElementById('lm-password').value.trim();
+    const a=DB.managers.find(a=>String(a.username).toLowerCase()===u.toLowerCase()&&String(a.password)===p);
+    if(!a){err.style.display='block';return;}
+    session={user:a,role:'manager'};
+  }else{
+    if(document.getElementById('l-execcode').value.trim()!==String(DB.execCode)){err.style.display='block';return;}
+    session={user:{name:'Executive',username:'exec',id:'exec'},role:'exec'};
+  }
+  launchApp();
+}
+function logout(){
+  session={user:null,role:null};editingId=null;
+  document.getElementById('screen-app').classList.remove('active');
+  document.getElementById('screen-login').classList.add('active');
+  ['l-username','l-password','lm-username','lm-password','l-execcode'].forEach(id=>document.getElementById(id).value='');
+}
+function launchApp(){
+  document.getElementById('screen-login').classList.remove('active');
+  document.getElementById('screen-app').classList.add('active');
+  const role=session.role;const name=session.user.name;
+  const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const av=document.getElementById('top-av');av.textContent=initials;av.className='avatar av-'+role;
+  document.getElementById('top-name').textContent=name;
+  const rc=document.getElementById('role-chip');rc.className='role-chip chip-'+role;rc.textContent=role.charAt(0).toUpperCase()+role.slice(1);
+  ['sb-staff','sb-manager','sb-exec'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('sb-'+role).style.display='block';
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
+  if(role==='staff'){initLogForm();document.getElementById('page-log').classList.add('active');document.querySelector('#sb-staff .nav').classList.add('active');}
+  else if(role==='manager'){renderMgrDash();document.getElementById('page-mgr-dash').classList.add('active');document.querySelector('#sb-manager .nav').classList.add('active');}
+  else{renderExecDash();document.getElementById('page-exec-dash').classList.add('active');document.querySelector('#sb-exec .nav').classList.add('active');}
+  updateClock();updateBadges();
+}
+
+function gp(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
+  const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
+  if(el)el.classList.add('active');
+  const r={
+    'mgr-dash':renderMgrDash,
+    'mgr-entries':()=>{fillClientFilter('mf-client');renderMgrEntries();},
+    'mgr-late':renderLateList,
+    'mgr-staff':renderStaffTable,
+    'mgr-clients':renderClientList,
+    'mgr-codes':renderMgrCodesPage,
+    'my-logs':renderMyLogs,
+    'exec-dash':renderExecDash,
+    'exec-entries':()=>{fillClientFilter('ef-client');renderExecEntries();},
+    'exec-clients':renderExecClients,
+    'exec-staff':renderExecStaff,
+    'exec-codes':renderExecCodesPage,
+    'exec-managers':renderManagerTable,
+  };
+  if(r[id])r[id]();
+}
+
+// LOG FORM
+function initLogForm(){
+  document.getElementById('f-date').value=todayStr();
+  document.getElementById('f-sname').value=session.user.name;
+  document.getElementById('f-gnotes').value='';
+  document.getElementById('f-reason').value='';
+  document.getElementById('f-apprcode').value='';
+  document.getElementById('appr-err').style.display='none';
+  ceCount=0;document.getElementById('ce-wrap').innerHTML='';addCE();
+  document.getElementById('submit-btn').textContent='✔ Submit Work Log';
+  document.getElementById('cancel-btn').style.display='none';
+  editingId=null;updateClock();
+}
+function buildClientOpts(sel,val){
+  sel.innerHTML='<option value="">— Select client —</option>';
+  DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;if(c===val)o.selected=true;sel.appendChild(o);});
+}
+function addCE(data){
+  ceCount++;
+  const rowId='ce-'+Date.now()+ceCount;
+  const div=document.createElement('div');
+  div.className='ce-row';div.id=rowId;
+  div.innerHTML=`<div class="ce-hdr"><span class="ce-num">Entry #${ceCount}</span>${ceCount>1?`<button class="btn btn-danger btn-xs" onclick="document.getElementById('${rowId}').remove()">✕ Remove</button>`:''}</div>
+    <div class="ce-grid">
+      <div class="f"><label>Client *</label><select class="cr-cl"></select></div>
+      <div class="f"><label>Hours *</label><input type="number" class="cr-hr" min="0.5" max="24" step="0.5" placeholder="e.g. 4"/></div>
+      <div class="f full"><label>Tasks Completed *</label><textarea class="cr-tk" placeholder="Describe what you worked on..." style="min-height:70px"></textarea></div>
+    </div>`;
+  document.getElementById('ce-wrap').appendChild(div);
+  buildClientOpts(div.querySelector('.cr-cl'),data?data.client:'');
+  if(data){div.querySelector('.cr-hr').value=data.hours;div.querySelector('.cr-tk').value=data.tasks;}
+}
+function getCERows(){
+  return Array.from(document.querySelectorAll('.ce-row')).map(row=>({
+    client:row.querySelector('.cr-cl').value,
+    hours:parseFloat(row.querySelector('.cr-hr').value)||0,
+    tasks:row.querySelector('.cr-tk').value.trim()
+  }));
+}
+
+async function submitLog(){
+  const date=document.getElementById('f-date').value;
+  const gnotes=document.getElementById('f-gnotes').value.trim();
+  const rows=getCERows();
+  if(!date){toast('Please select a date.','err');return;}
+  for(const r of rows){
+    if(!r.client){toast('Select a client for each entry.','err');return;}
+    if(!r.hours||r.hours<=0){toast('Enter hours for each entry.','err');return;}
+    if(!r.tasks){toast('Enter tasks for each entry.','err');return;}
+  }
+  const late=isLate();
+  let reason='',approved=false,usedCodeId='';
+  const staffId=session.user.id;
+  const staffName=session.user.name;
+  if(late&&!editingId){
+    reason=document.getElementById('f-reason').value.trim();
+    const code=document.getElementById('f-apprcode').value.trim().toUpperCase();
+    const errEl=document.getElementById('appr-err');errEl.style.display='none';
+    if(!reason){toast('Enter a reason.','err');return;}
+    if(!code){errEl.textContent='Please enter the approval code.';errEl.style.display='block';return;}
+    await syncAll();
+    const matchCode=DB.codes.find(c=>c.code===code);
+    if(!matchCode){errEl.textContent='Invalid code.';errEl.style.display='block';return;}
+    if(matchCode.used){errEl.textContent='This code has already been used.';errEl.style.display='block';return;}
+    if(matchCode.staffId&&matchCode.staffId!==staffId){errEl.textContent='This code was issued for a different staff member.';errEl.style.display='block';return;}
+    try {
+      const res = await api('useCode',{codeId:matchCode.id,staffId,staffName});
+      if(!res.ok){errEl.textContent='Code could not be used: '+(res.error||'unknown');errEl.style.display='block';return;}
+      usedCodeId=matchCode.id;approved=true;
+    } catch(e){errEl.textContent='Server error: '+e.message;errEl.style.display='block';return;}
+  }
+  const submittedAt=nowTime();
+  try {
+    if(editingId){
+      await api('updateEntry',{data:{id:editingId,staffId,staffName,date,gnotes,rows,late:false,reason:'',approved:false,submittedAt,usedCodeId:'',editedAt:submittedAt}});
+      toast('Entry updated!','ok');
+    } else {
+      await api('addEntry',{data:{id:'e'+Date.now(),staffId,staffName,date,gnotes,rows,late,reason,approved,submittedAt,usedCodeId,editedAt:''}});
+      toast('Work log submitted!','ok');
+    }
+    await syncAll();
+    initLogForm();
+  } catch(e){toast('Save failed: '+e.message,'err');}
+}
+function cancelEdit(){editingId=null;initLogForm();}
+
+function renderMyLogs(){
+  const mine=DB.entries.filter(e=>e.staffId===session.user.id).reverse();
+  const el=document.getElementById('my-logs-list');
+  el.innerHTML=mine.length?mine.map(e=>entryCard(e,true)).join(''):emptyState('📭','No entries yet.');
+}
+async function editEntry(id){
+  if(isLate()){toast('Editing is locked after 6:30 PM.','err');return;}
+  const e=DB.entries.find(en=>String(en.id)===String(id));if(!e)return;
+  editingId=id;
+  document.getElementById('f-date').value=e.date;
+  document.getElementById('f-gnotes').value=e.gnotes||'';
+  ceCount=0;document.getElementById('ce-wrap').innerHTML='';
+  (e.rows||[]).forEach(r=>addCE(r));
+  document.getElementById('submit-btn').textContent='💾 Save Changes';
+  document.getElementById('cancel-btn').style.display='flex';
+  gp('log',document.querySelector('#sb-staff .nav'));
+  window.scrollTo(0,0);
+}
+async function deleteEntry(id){
+  if(!confirm('Delete this entry permanently?'))return;
+  try {await api('deleteEntry',{id});await syncAll();renderMyLogs();toast('Entry deleted.');}
+  catch(e){toast('Delete failed.','err');}
+}
+function entryCard(e,isOwner){
+  const totH=(e.rows||[]).reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
+  const canEdit=isOwner&&!isLate();
+  const code=e.usedCodeId?DB.codes.find(c=>String(c.id)===String(e.usedCodeId)):null;
+  const codeIssuerLabel=code?(code.issuedByRole==='exec'?'Executive':code.issuedByName||'Manager'):'';
+  return `<div class="ec">
+    <div class="ec-top">
+      <div><div class="ec-name">${e.staffName}</div><div class="ec-un">@${e.staffId}</div></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span class="tag ${e.late?'t-late':'t-ok'}">${e.late?'⚠ Late (approved)':'✓ On time'}</span>
+        ${e.editedAt?`<span class="tag t-pu" style="font-size:10px">✏ Edited</span>`:''}
+      </div>
+    </div>
+    <div class="ec-meta"><span>📅 ${e.date}</span><span>🕐 ${e.submittedAt}</span><span>⏱ ${totH.toFixed(1)}h</span>${codeIssuerLabel?`<span>🎟 By ${codeIssuerLabel}</span>`:''}</div>
+    <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span></div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div></div>`).join('')}</div>
+    ${e.gnotes?`<div class="ec-notes">💬 ${e.gnotes}</div>`:''}
+    ${e.late&&e.reason?`<div class="ec-reason">📋 ${e.reason}</div>`:''}
+    ${canEdit?`<div class="ec-acts"><button class="btn btn-ghost btn-sm" onclick="editEntry('${e.id}')">✏ Edit</button><button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">✕ Delete</button></div>`:''}
+  </div>`;
+}
+
+function renderMgrDash(){
+  const today=todayStr();
+  const todayE=DB.entries.filter(e=>e.date===today);
+  const totH=DB.entries.reduce((s,e)=>s+totalH(e),0);
+  const late=DB.entries.filter(e=>e.late).length;
+  document.getElementById('mgr-stats').innerHTML=`
+    <div class="sc"><div class="sl">Total Entries</div><div class="sv sv-ac">${DB.entries.length}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Today</div><div class="sv sv-gr">${todayE.length}</div><div class="ss">${today}</div></div>
+    <div class="sc"><div class="sl">Total Hours</div><div class="sv">${totH.toFixed(1)}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Late Entries</div><div class="sv sv-am">${late}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Staff</div><div class="sv sv-te">${DB.staff.length}</div><div class="ss">registered</div></div>`;
+  barChart('bc-staff',staffHoursMap());
+  barChart('bc-client',clientHoursMap());
+  const tl=document.getElementById('today-list');
+  tl.innerHTML=todayE.length?todayE.map(e=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)"><div><div style="font-family:var(--font);font-size:14px;font-weight:800">${e.staffName}</div><div style="font-size:12px;color:var(--ink3);margin-top:2px">${totalH(e)}h · ${(e.rows||[]).map(r=>r.client).join(', ')}</div></div><span class="tag ${e.late?'t-late':'t-ok'}">${e.late?'Late':'On time'}</span></div>`).join(''):'<p style="font-size:13px;color:var(--ink3);padding:1rem 0">No submissions today.</p>';
+}
+function renderMgrEntries(){
+  const nf=document.getElementById('mf-name').value.toLowerCase();
+  const cf=document.getElementById('mf-client').value;
+  const sf=document.getElementById('mf-status').value;
+  const df=document.getElementById('mf-date').value;
+  const data=[...DB.entries].reverse().filter(e=>{
+    if(nf&&!String(e.staffName).toLowerCase().includes(nf))return false;
+    if(cf&&!(e.rows||[]).some(r=>r.client===cf))return false;
+    if(sf==='ontime'&&e.late)return false;
+    if(sf==='late'&&!e.late)return false;
+    if(df&&e.date!==df)return false;
+    return true;
+  });
+  document.getElementById('mgr-entries-list').innerHTML=data.length?data.map(e=>entryCard(e,false)).join(''):emptyState('📭','No entries match filters.');
+}
+function renderLateList(){
+  const late=DB.entries.filter(e=>e.late).reverse();
+  document.getElementById('late-list').innerHTML=late.length?late.map(e=>entryCard(e,false)).join(''):emptyState('✅','No late submissions yet.');
+}
+
+function renderStaffTable(){
+  const tbody=document.getElementById('staff-tbody');
+  if(!DB.staff.length){tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink3)">No staff accounts yet.</td></tr>`;return;}
+  tbody.innerHTML=DB.staff.map(a=>{
+    const count=DB.entries.filter(e=>e.staffId===a.id).length;
+    return `<tr><td style="font-family:var(--font);font-weight:800">${a.name}</td><td style="color:var(--ink2)">@${a.username}</td><td style="color:var(--ink3)">${a.createdAt||'—'}</td><td><span class="tag" style="background:var(--accent-g);color:var(--accent)">${count}</span></td><td><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-xs" onclick="openResetModal('staff','${a.id}','${a.name}')">Reset Pass</button><button class="btn btn-danger btn-xs" onclick="deleteStaff('${a.id}')">✕</button></div></td></tr>`;
+  }).join('');
+}
+function openNewStaffModal(){
+  ['sm-name','sm-user','sm-pass'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('sm-err').style.display='none';
+  document.getElementById('staff-modal').classList.add('show');
+}
+async function saveStaff(){
+  const name=document.getElementById('sm-name').value.trim();
+  const uname=document.getElementById('sm-user').value.trim().toLowerCase().replace(/\s+/g,'.');
+  const pass=document.getElementById('sm-pass').value.trim();
+  const err=document.getElementById('sm-err');err.style.display='none';
+  if(!name||!uname||!pass){err.textContent='All fields are required.';err.style.display='block';return;}
+  if(DB.staff.find(a=>String(a.username).toLowerCase()===uname)){err.textContent='Username already exists.';err.style.display='block';return;}
+  try {
+    await api('addStaff',{data:{id:'s'+Date.now(),name,username:uname,password:pass,createdAt:todayStr()}});
+    await syncAll();renderStaffTable();closeModal('staff-modal');toast(`Account created for ${name}.`,'ok');
+  } catch(e){err.textContent='Save failed: '+e.message;err.style.display='block';}
+}
+async function deleteStaff(id){
+  if(!confirm('Remove this staff account?'))return;
+  try {await api('deleteStaff',{id});await syncAll();renderStaffTable();toast('Account removed.');}
+  catch(e){toast('Delete failed.','err');}
+}
+
+function renderManagerTable(){
+  const tbody=document.getElementById('mgr-acct-tbody');
+  if(!DB.managers.length){tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink3)">No manager accounts yet.</td></tr>`;return;}
+  tbody.innerHTML=DB.managers.map(a=>{
+    const codeCount=DB.codes.filter(c=>c.issuedById===a.id).length;
+    return `<tr><td style="font-family:var(--font);font-weight:800">${a.name}</td><td style="color:var(--ink2)">@${a.username}</td><td style="color:var(--ink3)">${a.createdAt||'—'}</td><td><span class="tag t-mgr">${codeCount}</span></td><td><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-xs" onclick="openResetModal('manager','${a.id}','${a.name}')">Reset Pass</button><button class="btn btn-danger btn-xs" onclick="deleteManager('${a.id}')">✕</button></div></td></tr>`;
+  }).join('');
+}
+function openNewManagerModal(){
+  ['mm-name','mm-user','mm-pass'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('mm-err').style.display='none';
+  document.getElementById('manager-modal').classList.add('show');
+}
+async function saveManager(){
+  const name=document.getElementById('mm-name').value.trim();
+  const uname=document.getElementById('mm-user').value.trim().toLowerCase().replace(/\s+/g,'.');
+  const pass=document.getElementById('mm-pass').value.trim();
+  const err=document.getElementById('mm-err');err.style.display='none';
+  if(!name||!uname||!pass){err.textContent='All fields required.';err.style.display='block';return;}
+  if(DB.managers.find(a=>String(a.username).toLowerCase()===uname)){err.textContent='Username exists.';err.style.display='block';return;}
+  try {
+    await api('addManager',{data:{id:'m'+Date.now(),name,username:uname,password:pass,createdAt:todayStr()}});
+    await syncAll();renderManagerTable();closeModal('manager-modal');toast(`Manager ${name} created.`,'ok');
+  } catch(e){err.textContent='Save failed: '+e.message;err.style.display='block';}
+}
+async function deleteManager(id){
+  if(!confirm('Remove this manager?'))return;
+  try {await api('deleteManager',{id});await syncAll();renderManagerTable();toast('Manager removed.');}
+  catch(e){toast('Delete failed.','err');}
+}
+
+function openResetModal(type,id,name){
+  resetTarget={type,id};
+  document.getElementById('reset-modal-s').textContent=`Set a new password for ${name}.`;
+  document.getElementById('rm-pass').value='';document.getElementById('rm-err').style.display='none';
+  document.getElementById('reset-modal').classList.add('show');
+}
+async function doResetPass(){
+  const pass=document.getElementById('rm-pass').value.trim();
+  const err=document.getElementById('rm-err');
+  if(!pass){err.textContent='Password cannot be empty.';err.style.display='block';return;}
+  try {
+    await api(resetTarget.type==='staff'?'resetStaff':'resetManager',{id:resetTarget.id,password:pass});
+    await syncAll();closeModal('reset-modal');
+    if(resetTarget.type==='staff')renderStaffTable();else renderManagerTable();
+    toast('Password reset.','ok');
+  } catch(e){err.textContent='Reset failed: '+e.message;err.style.display='block';}
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('show');
+  if(id==='gen-code-modal'){
+    document.getElementById('gen-step1').style.display='block';
+    document.getElementById('gen-step2').style.display='none';
+    if(session.role==='manager')renderMgrCodesPage();
+    else if(session.role==='exec')renderExecCodesPage();
+  }
+}
+
+function renderClientList(){
+  document.getElementById('client-list').innerHTML=DB.clients.map(c=>`<li class="cmgr-item"><span>${c}</span><button class="del-ic" onclick="removeClient('${c}')">✕</button></li>`).join('');
+}
+async function addClient(){
+  const v=document.getElementById('new-client').value.trim();
+  if(!v)return;
+  try {
+    const res=await api('addClient',{name:v});
+    if(!res.ok){toast(res.error==='exists'?'Client already exists.':'Add failed.','err');return;}
+    document.getElementById('new-client').value='';
+    await syncAll();renderClientList();toast(`"${v}" added.`,'ok');
+  } catch(e){toast('Failed: '+e.message,'err');}
+}
+async function removeClient(name){
+  if(!confirm(`Remove "${name}"?`))return;
+  try {await api('deleteClient',{name});await syncAll();renderClientList();toast('Client removed.');}
+  catch(e){toast('Failed: '+e.message,'err');}
+}
+
+async function changeExecCode(){
+  const cur=document.getElementById('ep-cur').value.trim();
+  const nw=document.getElementById('ep-new').value.trim();
+  const con=document.getElementById('ep-con').value.trim();
+  const err=document.getElementById('ep-err');err.style.display='none';
+  if(cur!==String(DB.execCode)){err.textContent='Current password incorrect.';err.style.display='block';return;}
+  if(!nw){err.textContent='New password empty.';err.style.display='block';return;}
+  if(nw!==con){err.textContent='Passwords do not match.';err.style.display='block';return;}
+  try {
+    await api('setExecCode',{value:nw});await syncAll();
+    ['ep-cur','ep-new','ep-con'].forEach(id=>document.getElementById(id).value='');
+    toast('Password updated.','ok');
+  } catch(e){err.textContent='Update failed: '+e.message;err.style.display='block';}
+}
+
+function generateCodeString(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s='';for(let i=0;i<8;i++)s+=chars[Math.floor(Math.random()*chars.length)];
+  return s.slice(0,4)+'-'+s.slice(4);
+}
+function openGenCodeModal(ctx){
+  genCodeContext=ctx;
+  if(ctx==='manager'&&!canManagerIssueCodes()){toast('Managers can only issue codes 6:30-9 PM.','err');return;}
+  const sel=document.getElementById('gc-staff');
+  sel.innerHTML='<option value="">— Select staff —</option><option value="any">Any staff</option>';
+  DB.staff.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=`${a.name} (@${a.username})`;sel.appendChild(o);});
+  document.getElementById('gc-note').value='';
+  document.getElementById('gen-step1').style.display='block';
+  document.getElementById('gen-step2').style.display='none';
+  document.getElementById('gen-code-modal').classList.add('show');
+}
+async function generateCode(){
+  const staffSel=document.getElementById('gc-staff').value;
+  const note=document.getElementById('gc-note').value.trim();
+  if(!staffSel){toast('Select staff.','err');return;}
+  if(genCodeContext==='manager'&&!canManagerIssueCodes()){toast('Window closed.','err');closeModal('gen-code-modal');return;}
+  let staffId='',staffName='Any staff';
+  if(staffSel!=='any'){const a=DB.staff.find(a=>a.id===staffSel);if(a){staffId=a.id;staffName=a.name;}}
+  let code;do{code=generateCodeString();}while(DB.codes.find(c=>c.code===code));
+  try {
+    await api('addCode',{data:{
+      id:'c'+Date.now(),code,staffId,staffName,note,
+      issuedByRole:session.role,issuedById:session.user.id,issuedByName:session.user.name,
+      generatedAt:new Date().toISOString(),generatedDate:todayStr(),generatedTime:nowTime(),
+      used:false,usedBy:'',usedByName:'',usedAt:''
+    }});
+    await syncAll();
+    lastGeneratedCode=code;
+    document.getElementById('gen-code-value').textContent=code;
+    document.getElementById('gen-code-for').textContent=staffName;
+    document.getElementById('gen-step1').style.display='none';
+    document.getElementById('gen-step2').style.display='block';
+    toast('Code generated.','ok');
+  } catch(e){toast('Failed: '+e.message,'err');}
+}
+function copyCode(){navigator.clipboard.writeText(lastGeneratedCode).then(()=>toast('Copied.','ok'));}
+
+function refreshMgrCodeWindowInfo(){
+  const win=timeWindow();
+  const el=document.getElementById('mgr-code-window-info');
+  const btn=document.getElementById('mgr-gen-btn');
+  if(win==='manager'){
+    el.innerHTML=`<div class="info-banner" style="background:var(--green-b);border-color:rgba(34,197,94,.2);color:var(--green)"><span>✓</span><span>You can issue codes now. Window closes at 9:00 PM.</span></div>`;
+    btn.disabled=false;
+  }else if(win==='open'){
+    el.innerHTML=`<div class="info-banner"><span>ℹ</span><span>Manager codes can be issued 6:30 PM – 9:00 PM.</span></div>`;
+    btn.disabled=true;
+  }else{
+    el.innerHTML=`<div class="info-banner" style="background:var(--red-b);border-color:rgba(239,68,68,.2);color:var(--red)"><span>⛔</span><span>Window closed. Only executive can issue codes now.</span></div>`;
+    btn.disabled=true;
+  }
+}
+function renderMgrCodesPage(){
+  refreshMgrCodeWindowInfo();
+  const mine=DB.codes.filter(c=>c.issuedById===session.user.id);
+  const total=mine.length;const used=mine.filter(c=>c.used).length;const unused=total-used;
+  const todayCodes=mine.filter(c=>c.generatedDate===todayStr()).length;
+  document.getElementById('mgr-codes-stats').innerHTML=`
+    <div class="sc"><div class="sl">Issued by You</div><div class="sv sv-pu">${total}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Used</div><div class="sv sv-gr">${used}</div><div class="ss">consumed</div></div>
+    <div class="sc"><div class="sl">Active</div><div class="sv sv-am">${unused}</div><div class="ss">unused</div></div>
+    <div class="sc"><div class="sl">Today</div><div class="sv sv-ac">${todayCodes}</div><div class="ss">${todayStr()}</div></div>`;
+  const tbody=document.getElementById('mgr-codes-tbody');
+  tbody.innerHTML=total?[...mine].reverse().map(c=>codeRow(c,true)).join(''):`<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--ink3)">No codes issued yet.</td></tr>`;
+}
+function renderExecCodesPage(){
+  const all=DB.codes;const total=all.length;
+  const used=all.filter(c=>c.used).length;const unused=total-used;
+  const byMgr=all.filter(c=>c.issuedByRole==='manager').length;
+  document.getElementById('exec-codes-stats').innerHTML=`
+    <div class="sc"><div class="sl">Total Codes</div><div class="sv sv-pu">${total}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Used</div><div class="sv sv-gr">${used}</div><div class="ss">consumed</div></div>
+    <div class="sc"><div class="sl">Active</div><div class="sv sv-am">${unused}</div><div class="ss">unused</div></div>
+    <div class="sc"><div class="sl">By Managers</div><div class="sv sv-te">${byMgr}</div><div class="ss">vs ${total-byMgr} by exec</div></div>`;
+  const tbody=document.getElementById('exec-codes-tbody');
+  tbody.innerHTML=total?[...all].reverse().map(c=>codeRow(c,false)).join(''):`<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--ink3)">No codes yet.</td></tr>`;
+}
+function codeRow(c,isMgrView){
+  const issuerTag=c.issuedByRole==='exec'?`<span class="tag t-pu">Exec</span>`:`<span class="tag t-mgr">${c.issuedByName||'Manager'}</span>`;
+  return `<tr><td style="font-family:var(--font);font-weight:800;letter-spacing:.1em;color:${c.used?'var(--ink3)':'var(--purple)'}">${c.code}</td><td>${c.staffName}${c.note?`<div style="font-size:11px;color:var(--ink3);margin-top:2px">📝 ${c.note}</div>`:''}</td>${isMgrView?'':`<td>${issuerTag}</td>`}<td style="color:var(--ink3);font-size:12px">${c.generatedDate} ${c.generatedTime}</td><td><span class="tag ${c.used?'t-used':'t-ok'}">${c.used?'✕ Used':'● Active'}</span></td><td>${c.used?`<div style="font-size:12px"><div>${c.usedByName||'—'}</div></div>`:'—'}</td><td>${!c.used?`<button class="btn btn-danger btn-xs" onclick="revokeCode('${c.id}')">Revoke</button>`:''}</td></tr>`;
+}
+async function revokeCode(id){
+  if(!confirm('Revoke this code?'))return;
+  try {await api('revokeCode',{id});await syncAll();
+    if(session.role==='manager')renderMgrCodesPage();else renderExecCodesPage();
+    toast('Code revoked.');}
+  catch(e){toast('Failed.','err');}
+}
+
+function renderExecDash(){
+  const totH=DB.entries.reduce((s,e)=>s+totalH(e),0);
+  const staffSet=new Set(DB.entries.map(e=>e.staffId));
+  const clientSet=new Set();DB.entries.forEach(e=>(e.rows||[]).forEach(r=>clientSet.add(r.client)));
+  const compliance=DB.entries.length?Math.round(DB.entries.filter(e=>!e.late).length/DB.entries.length*100):100;
+  const activeCodes=DB.codes.filter(c=>!c.used).length;
+  document.getElementById('exec-stats').innerHTML=`
+    <div class="sc"><div class="sl">Total Logs</div><div class="sv sv-ac">${DB.entries.length}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Active Staff</div><div class="sv sv-gr">${staffSet.size}</div><div class="ss">≥ 1 entry</div></div>
+    <div class="sc"><div class="sl">Total Hours</div><div class="sv sv-pu">${totH.toFixed(1)}</div><div class="ss">logged</div></div>
+    <div class="sc"><div class="sl">Clients</div><div class="sv sv-am">${clientSet.size}</div><div class="ss">served</div></div>
+    <div class="sc"><div class="sl">Compliance</div><div class="sv sv-gr">${compliance}%</div><div class="ss">on-time</div></div>
+    <div class="sc"><div class="sl">Active Codes</div><div class="sv sv-pu">${activeCodes}</div><div class="ss">unused</div></div>`;
+  barChart('ebc-staff',staffHoursMap());
+  barChart('ebc-client',clientHoursMap());
+  const days=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  const sc=DB.staff.length||1;
+  document.getElementById('trend-tbl').innerHTML=`<table class="etbl"><thead><tr><th>Date</th><th>Entries</th><th>Hours</th><th>Rate</th></tr></thead><tbody>${days.map(d=>{const de=DB.entries.filter(e=>e.date===d);const h=de.reduce((s,e)=>s+totalH(e),0).toFixed(1);const rate=Math.min(Math.round(de.length/sc*100),100);return `<tr><td>${d}</td><td>${de.length}</td><td>${h}h</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden"><div style="width:${rate}%;height:100%;background:var(--accent);border-radius:3px"></div></div><span style="font-size:12px;color:var(--ink3);width:34px">${rate}%</span></div></td></tr>`;}).join('')}</tbody></table>`;
+}
+function renderExecEntries(){
+  const nf=document.getElementById('ef-name').value.toLowerCase();
+  const cf=document.getElementById('ef-client').value;
+  const df=document.getElementById('ef-date').value;
+  const data=[...DB.entries].reverse().filter(e=>{
+    if(nf&&!String(e.staffName).toLowerCase().includes(nf))return false;
+    if(cf&&!(e.rows||[]).some(r=>r.client===cf))return false;
+    if(df&&e.date!==df)return false;return true;
+  });
+  document.getElementById('exec-entries-list').innerHTML=data.length?data.map(e=>entryCard(e,false)).join(''):emptyState('📭','No entries.');
+}
+function renderExecClients(){
+  const map={};DB.entries.forEach(e=>(e.rows||[]).forEach(r=>{if(!map[r.client])map[r.client]={hours:0,staff:new Set(),count:0};map[r.client].hours+=parseFloat(r.hours)||0;map[r.client].staff.add(e.staffId);map[r.client].count++;}));
+  const sorted=Object.entries(map).sort((a,b)=>b[1].hours-a[1].hours);
+  const el=document.getElementById('exec-client-data');
+  el.innerHTML=sorted.length?`<div class="sg">${sorted.map(([n,d])=>`<div class="sc"><div class="sl">${n}</div><div class="sv sv-ac">${d.hours.toFixed(1)}<span style="font-size:16px;color:var(--ink3)">h</span></div><div class="ss">${d.count} entries · ${d.staff.size} staff</div></div>`).join('')}</div>`:emptyState('📭','No data.');
+}
+function renderExecStaff(){
+  const map={};DB.entries.forEach(e=>{if(!map[e.staffId])map[e.staffId]={name:e.staffName,hours:0,entries:0,lateCount:0,clients:new Set()};map[e.staffId].hours+=totalH(e);map[e.staffId].entries++;if(e.late)map[e.staffId].lateCount++;(e.rows||[]).forEach(r=>map[e.staffId].clients.add(r.client));});
+  const sorted=Object.values(map).sort((a,b)=>b.hours-a.hours);
+  const el=document.getElementById('exec-staff-data');
+  el.innerHTML=sorted.length?`<table class="etbl"><thead><tr><th>Name</th><th>Hours</th><th>Entries</th><th>Clients</th><th>Late</th><th>Compliance</th></tr></thead><tbody>${sorted.map(s=>{const comp=s.entries?Math.round((s.entries-s.lateCount)/s.entries*100):100;return `<tr><td style="font-family:var(--font);font-weight:800">${s.name}</td><td><strong>${s.hours.toFixed(1)}h</strong></td><td>${s.entries}</td><td>${s.clients.size}</td><td>${s.lateCount>0?`<span class="tag t-late">${s.lateCount}</span>`:'-'}</td><td><span class="tag ${comp>=90?'t-ok':comp>=70?'t-late':'t-pend'}">${comp}%</span></td></tr>`;}).join('')}</tbody></table>`:emptyState('📭','No data.');
+}
+
+function exportCSV(){
+  if(!DB.entries.length){toast('Nothing to export.','err');return;}
+  const rows=[['Staff','Username','Date','Time','Client','Hours','Tasks','Notes','Status','Reason','Code','Issued By']];
+  DB.entries.forEach(e=>{
+    const code=e.usedCodeId?DB.codes.find(c=>String(c.id)===String(e.usedCodeId)):null;
+    (e.rows||[]).forEach(r=>{
+      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${code?code.code:''}"`,`"${code?(code.issuedByRole==='exec'?'Executive':code.issuedByName):''}"`]);
+    });
+  });
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='worklog_'+todayStr()+'.csv';a.click();toast('Exported.','ok');
+}
+
+function totalH(e){return(e.rows||[]).reduce((s,r)=>s+(parseFloat(r.hours)||0),0);}
+function staffHoursMap(){const m={};DB.entries.forEach(e=>{m[e.staffName]=(m[e.staffName]||0)+totalH(e);});return m;}
+function clientHoursMap(){const m={};DB.entries.forEach(e=>(e.rows||[]).forEach(r=>{m[r.client]=(m[r.client]||0)+(parseFloat(r.hours)||0);}));return m;}
+function barChart(id,map){
+  const el=document.getElementById(id);
+  const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  if(!sorted.length){el.innerHTML='<p style="font-size:13px;color:var(--ink3)">No data yet.</p>';return;}
+  const max=sorted[0][1];
+  el.innerHTML=sorted.map(([name,val])=>`<div class="bcr"><div class="bcl" title="${name}">${name}</div><div class="bct"><div class="bcf" style="width:${max?Math.round(val/max*100):0}%"></div></div><div class="bcv">${val.toFixed(1)}</div></div>`).join('');
+}
+function fillClientFilter(id){
+  const sel=document.getElementById(id);const prev=sel.value;
+  sel.innerHTML='<option value="">All clients</option>';
+  DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;if(c===prev)o.selected=true;sel.appendChild(o);});
+}
+function updateBadges(){
+  const myId=session.user?session.user.id:null;
+  const myCount=myId&&session.role==='staff'?DB.entries.filter(e=>e.staffId===myId).length:0;
+  const lateCount=DB.entries.filter(e=>e.late).length;
+  const total=DB.entries.length;
+  const activeCodes=DB.codes.filter(c=>!c.used).length;
+  const mineCodes=myId?DB.codes.filter(c=>c.issuedById===myId&&!c.used).length:0;
+  const bm=document.getElementById('b-mylog');if(bm)bm.textContent=myCount;
+  const bM=document.getElementById('b-mgr');if(bM)bM.textContent=total;
+  const bP=document.getElementById('b-pend');if(bP)bP.textContent=lateCount;
+  const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
+  const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
+}
+function emptyState(icon,msg){return`<div style="text-align:center;padding:4rem 2rem;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">${icon}</div><p style="font-size:14px">${msg}</p></div>`;}
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast'+(type?' '+type:'');
+  t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+document.querySelectorAll('.modal-ov').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)closeModal(ov.id);}));
+
+// Auto-refresh every 60 seconds while app is open
+setInterval(()=>{if(document.getElementById('screen-app').classList.contains('active'))syncAll().catch(()=>{});},60000);
+
+init();
+</script>
+</body>
+</html>
