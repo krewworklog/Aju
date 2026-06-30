@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <title>WorkLog — Marketing Portal</title>
+<!-- PWA / install (Add to Home Screen) -->
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#0c0c0e"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="WorkLog"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
 <link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800&family=Satoshi:wght@300;400;500&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -220,6 +229,10 @@ textarea{resize:vertical;line-height:1.6;}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--s4);border-radius:4px;}
+.entry-tab{flex:1;min-width:150px;padding:12px 14px;border-radius:var(--rl);border:1px solid var(--border2);background:var(--s2);color:var(--ink2);font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:.15s;text-align:left;}
+.entry-tab:hover{border-color:var(--accent);}
+.entry-tab.active{background:var(--accent-g);border-color:var(--accent);color:var(--accent);}
+.entry-tab .et-sub{display:block;font-size:11px;font-weight:600;margin-top:3px;opacity:.8;}
 </style>
 </head>
 <body>
@@ -329,7 +342,14 @@ textarea{resize:vertical;line-height:1.6;}
     <main class="content">
       <!-- STAFF: LOG WORK -->
       <div class="page active" id="page-log">
-        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Add one or more client entries for today. Submit before 6:30 PM.</p></div></div>
+        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Log twice a day — Entry 1 by 2:00 PM and Entry 2 by 7:10 PM (Dubai time).</p></div></div>
+        <div class="card"><div class="ct">Which entry are you logging?</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap" id="entry-tabs">
+            <button type="button" class="entry-tab" id="entry-tab-1" onclick="setEntry(1)">Entry 1<span class="et-sub" id="et-sub-1">Due 2:00 PM</span></button>
+            <button type="button" class="entry-tab" id="entry-tab-2" onclick="setEntry(2)">Entry 2<span class="et-sub" id="et-sub-2">Due 7:10 PM</span></button>
+          </div>
+          <div id="entry-status" style="margin-top:10px;font-size:13px;color:var(--ink2)"></div>
+        </div>
         <div class="card"><div class="ct">Session Info</div><div class="fg">
           <div class="f"><label>Date *</label><input type="date" id="f-date"/></div>
           <div class="f"><label>Staff Name</label><input type="text" id="f-sname" readonly style="opacity:.6"/></div>
@@ -343,7 +363,7 @@ textarea{resize:vertical;line-height:1.6;}
         </div>
         <div class="appr-box" id="appr-box">
           <div class="appr-t" id="appr-title">⚠ Late Submission — Approval Code Required</div>
-          <div class="appr-s" id="appr-text">It is past 6:30 PM. Submitting now requires a one-time code from a manager (before 9 PM) or an executive.</div>
+          <div class="appr-s" id="appr-text">This entry is past its deadline. Submitting now requires a one-time code from a manager (before 9 PM) or an executive.</div>
           <div class="fg">
             <div class="f full"><label style="color:var(--amber)">Reason for Delay *</label><textarea id="f-reason" style="min-height:70px;border-color:rgba(245,158,11,.35)" placeholder="Explain why you are submitting late..."></textarea></div>
             <div class="f full"><label style="color:var(--amber)">One-Time Approval Code *</label><input type="text" id="f-apprcode" style="border-color:rgba(245,158,11,.35);font-family:var(--font);font-size:18px;letter-spacing:.2em;text-align:center;font-weight:800" placeholder="XXXX-XXXX" maxlength="9"/><div class="ferr" id="appr-err"></div></div>
@@ -357,7 +377,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- STAFF: MY LOGS -->
       <div class="page" id="page-my-logs">
-        <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit any log before 6:30 PM.</p></div></div>
+        <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit a log before its own deadline (Entry 1 · 2:00 PM, Entry 2 · 7:10 PM).</p></div></div>
         <div id="my-logs-list"></div>
       </div>
 
@@ -393,7 +413,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- MANAGER: CODES -->
       <div class="page" id="page-mgr-codes">
-        <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 6:30 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
+        <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 2:00 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
         <div id="mgr-code-window-info"></div>
         <div class="sg" id="mgr-codes-stats"></div>
         <div class="card"><div class="ct">Codes Issued by You</div>
@@ -693,50 +713,66 @@ async function syncAll(){
 //  TIME WINDOWS
 // ════════════════════════════════════════
 function pad(n){return String(n).padStart(2,'0');}
+// Dubai time (UTC+4, no DST). Shift the epoch by +4h then read UTC fields, so
+// date + deadline are judged in Dubai time on any device — not the viewer's
+// local timezone (the localDateStr approach, now timezone-safe).
+function dubaiDate(d){return new Date((d||new Date()).getTime()+4*3600*1000);}
+function localDateStr(d){const u=dubaiDate(d);return `${u.getUTCFullYear()}-${pad(u.getUTCMonth()+1)}-${pad(u.getUTCDate())}`;}
+function localTime(d){const u=dubaiDate(d);return `${pad(u.getUTCHours())}:${pad(u.getUTCMinutes())}`;}
+function dubaiMinutes(d){const u=dubaiDate(d);return u.getUTCHours()*60+u.getUTCMinutes();}
 function todayStr(){return localDateStr(new Date());}
-function localDateStr(d){d=d||new Date();const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
-function nowTime(){const n=new Date();return `${pad(n.getHours())}:${pad(n.getMinutes())}`;}
-function timeWindow(){
-  const n=new Date();const mins=n.getHours()*60+n.getMinutes();
-  if(mins < 18*60+30) return 'open';
-  if(mins < 21*60) return 'manager';
-  return 'exec';
-}
-function isLate(){return timeWindow()!=='open';}
-function canManagerIssueCodes(){return timeWindow()==='manager';}
+function nowTime(){return localTime();}
+
+// Two work-log entries per staff per day, each with its own Dubai-time deadline.
+const ENTRIES=[
+  {num:1,label:'Entry 1',deadlineMins:14*60,    deadlineLabel:'2:00 PM'},
+  {num:2,label:'Entry 2',deadlineMins:19*60+10, deadlineLabel:'7:10 PM'},
+];
+function entryDef(n){return ENTRIES.find(e=>e.num===Number(n))||ENTRIES[0];}
+let currentEntry=1; // which entry the staff is currently logging
+function isLateForEntry(n){return dubaiMinutes()>entryDef(n).deadlineMins;}
+function isLate(){return isLateForEntry(currentEntry);}
+// Manager-issued codes: from the first deadline (2 PM) until 9 PM; exec after.
+function canManagerIssueCodes(){const m=dubaiMinutes();return m>=14*60 && m<21*60;}
+function timeWindow(){const m=dubaiMinutes();if(m<14*60)return 'open';if(m<21*60)return 'manager';return 'exec';}
 
 function updateClock(){
-  const n=new Date();
   const clEl=document.getElementById('clock');if(!clEl)return;
-  clEl.textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}`;
-  const win=timeWindow();
+  clEl.textContent=nowTime();
+  const m=dubaiMinutes();
   const cdot=document.getElementById('cdot');
   const dc=document.getElementById('dl-chip');
-  if(win==='open'){
-    cdot.className='pulse';
-    const rem=(18*60+30)-(n.getHours()*60+n.getMinutes());
-    dc.className='dl-chip dl-ok';dc.textContent=`${Math.floor(rem/60)}h ${rem%60}m to deadline`;
-  } else if(win==='manager'){
-    cdot.className='pulse amber';
-    const rem=(21*60)-(n.getHours()*60+n.getMinutes());
-    dc.className='dl-chip dl-late';dc.textContent=`Late · Manager window (${Math.floor(rem/60)}h ${rem%60}m left)`;
+  // Countdown to the next upcoming entry deadline (Dubai time).
+  const next=ENTRIES.find(e=>m<=e.deadlineMins);
+  if(next){
+    const rem=next.deadlineMins-m;
+    cdot.className=next.num===1?'pulse':'pulse amber';
+    dc.className='dl-chip dl-ok';
+    dc.textContent=`${Math.floor(rem/60)}h ${rem%60}m to ${next.label} (${next.deadlineLabel})`;
   } else {
     cdot.className='pulse red';
-    dc.className='dl-chip dl-closed';dc.textContent='Executive approval only';
+    dc.className='dl-chip dl-closed';dc.textContent='Both deadlines passed';
   }
+  // Approval box reflects whether the entry being logged is late vs its deadline.
   const ab=document.getElementById('appr-box');
   if(ab){
-    ab.className='appr-box'+(win!=='open'?' show':'')+(win==='exec'?' closed':'');
+    const ent=entryDef(currentEntry);
+    const late=isLateForEntry(currentEntry);
+    const execOnly=m>=21*60;
+    ab.className='appr-box'+(late?' show':'')+(execOnly?' closed':'');
     const at=document.getElementById('appr-title');
     const atx=document.getElementById('appr-text');
-    if(win==='manager'&&at){
-      at.textContent='⚠ Late Submission — Approval Code Required';
-      atx.textContent='It is past 6:30 PM. A manager or executive can issue a one-time approval code. Request one and enter it below.';
-    } else if(win==='exec'&&at){
-      at.textContent='⛔ Late Submission — Executive Approval Only';
-      atx.textContent='It is past 9:00 PM. Only an executive can issue a code now.';
+    if(late&&at){
+      if(execOnly){
+        at.textContent='⛔ Late Submission — Executive Approval Only';
+        atx.textContent=`It is past 9:00 PM. ${ent.label} was due by ${ent.deadlineLabel}. Only an executive can issue a code now.`;
+      } else {
+        at.textContent='⚠ Late Submission — Approval Code Required';
+        atx.textContent=`${ent.label} was due by ${ent.deadlineLabel}. Submitting now requires a one-time code from a manager or executive.`;
+      }
     }
   }
+  if(typeof renderEntryTabs==='function')renderEntryTabs();
 }
 setInterval(updateClock,15000);
 
@@ -834,9 +870,44 @@ function initLogForm(){
   document.getElementById('f-apprcode').value='';
   document.getElementById('appr-err').style.display='none';
   ceCount=0;document.getElementById('ce-wrap').innerHTML='';addCE();
-  document.getElementById('submit-btn').textContent='✔ Submit Work Log';
   document.getElementById('cancel-btn').style.display='none';
-  editingId=null;updateClock();
+  editingId=null;
+  // Default to the first entry not yet submitted today.
+  const done=submittedEntriesToday();
+  setEntry((ENTRIES.find(e=>!done.has(e.num))||ENTRIES[0]).num);
+  updateClock();
+}
+// Which entries the logged-in staff has already submitted today (by entry number).
+function submittedEntriesToday(){
+  const t=todayStr();
+  return new Set((DB.entries||[])
+    .filter(e=>String(e.staffId)===String(session.user.id)&&String(e.date)===t&&e.entry)
+    .map(e=>Number(e.entry)));
+}
+function setEntry(n){
+  currentEntry=Number(n);
+  document.getElementById('submit-btn').textContent=editingId?'💾 Save Changes':`✔ Submit ${entryDef(currentEntry).label}`;
+  renderEntryTabs();
+  updateClock();
+}
+function renderEntryTabs(){
+  if(!document.getElementById('entry-tab-1'))return;
+  const done=editingId?new Set():submittedEntriesToday();
+  ENTRIES.forEach(e=>{
+    const btn=document.getElementById('entry-tab-'+e.num);
+    if(btn)btn.classList.toggle('active',e.num===currentEntry);
+    const sub=document.getElementById('et-sub-'+e.num);
+    if(sub)sub.textContent=done.has(e.num)?'✓ Submitted today':`Due ${e.deadlineLabel}${isLateForEntry(e.num)?' · late':''}`;
+  });
+  const st=document.getElementById('entry-status');
+  if(st){
+    const ent=entryDef(currentEntry),late=isLateForEntry(currentEntry);
+    if(!editingId&&done.has(currentEntry)){
+      st.innerHTML=`<span style="color:var(--amber)">You already submitted ${ent.label} today. Edit it from My Logs.</span>`;
+    } else {
+      st.innerHTML=`Logging <strong>${ent.label}</strong> · deadline ${ent.deadlineLabel} Dubai · status now: <strong style="color:${late?'var(--amber)':'var(--green)'}">${late?'LATE':'On time'}</strong>`;
+    }
+  }
 }
 function buildClientOpts(sel,val){
   sel.innerHTML='<option value="">— Select client —</option>';
@@ -875,6 +946,9 @@ async function submitLog(){
     if(!r.hours||r.hours<=0){toast('Enter hours for each entry.','err');return;}
     if(!r.tasks){toast('Enter tasks for each entry.','err');return;}
   }
+  if(!editingId && submittedEntriesToday().has(currentEntry)){
+    toast(`${entryDef(currentEntry).label} already submitted today — edit it from My Logs.`,'err');return;
+  }
   const late=isLate();
   let reason='',approved=false,usedCodeId='';
   const staffId=session.user.id;
@@ -899,11 +973,11 @@ async function submitLog(){
   const submittedAt=nowTime();
   try {
     if(editingId){
-      await api('updateEntry',{data:{id:editingId,staffId,staffName,date,gnotes,rows,late:false,reason:'',approved:false,submittedAt,usedCodeId:'',editedAt:submittedAt}});
+      await api('updateEntry',{data:{id:editingId,staffId,staffName,date,gnotes,rows,late:false,reason:'',approved:false,submittedAt,usedCodeId:'',editedAt:submittedAt,entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel}});
       toast('Entry updated!','ok');
     } else {
-      await api('addEntry',{data:{id:'e'+Date.now(),staffId,staffName,date,gnotes,rows,late,reason,approved,submittedAt,usedCodeId,editedAt:''}});
-      toast('Work log submitted!','ok');
+      await api('addEntry',{data:{id:'e'+Date.now(),staffId,staffName,date,gnotes,rows,late,reason,approved,submittedAt,usedCodeId,editedAt:'',entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel}});
+      toast(`${entryDef(currentEntry).label} submitted!`,'ok');
     }
     await syncAll();
     initLogForm();
@@ -917,15 +991,16 @@ function renderMyLogs(){
   el.innerHTML=mine.length?mine.map(e=>entryCard(e,true)).join(''):emptyState('📭','No entries yet.');
 }
 async function editEntry(id){
-  if(isLate()){toast('Editing is locked after 6:30 PM.','err');return;}
   const e=DB.entries.find(en=>String(en.id)===String(id));if(!e)return;
+  const en=Number(e.entry)||1;
+  if(isLateForEntry(en)){toast(`Editing is locked after the ${entryDef(en).label} deadline (${entryDef(en).deadlineLabel}).`,'err');return;}
   editingId=id;
   document.getElementById('f-date').value=e.date;
   document.getElementById('f-gnotes').value=e.gnotes||'';
   ceCount=0;document.getElementById('ce-wrap').innerHTML='';
   (e.rows||[]).forEach(r=>addCE(r));
-  document.getElementById('submit-btn').textContent='💾 Save Changes';
   document.getElementById('cancel-btn').style.display='flex';
+  setEntry(en);
   gp('log',document.querySelector('#sb-staff .nav'));
   window.scrollTo(0,0);
 }
@@ -936,18 +1011,21 @@ async function deleteEntry(id){
 }
 function entryCard(e,isOwner){
   const totH=(e.rows||[]).reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
-  const canEdit=isOwner&&!isLate();
+  const en=Number(e.entry)||0;
+  const entryLabel=e.entryLabel||(en?entryDef(en).label:'');
+  const canEdit=isOwner&&en&&!isLateForEntry(en);
   const code=e.usedCodeId?DB.codes.find(c=>String(c.id)===String(e.usedCodeId)):null;
   const codeIssuerLabel=code?(code.issuedByRole==='exec'?'Executive':code.issuedByName||'Manager'):'';
   return `<div class="ec">
     <div class="ec-top">
       <div><div class="ec-name">${e.staffName}</div><div class="ec-un">@${e.staffId}</div></div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${entryLabel?`<span class="tag t-pu">${entryLabel}</span>`:''}
         <span class="tag ${e.late?'t-late':'t-ok'}">${e.late?'⚠ Late (approved)':'✓ On time'}</span>
         ${e.editedAt?`<span class="tag t-pu" style="font-size:10px">✏ Edited</span>`:''}
       </div>
     </div>
-    <div class="ec-meta"><span>📅 ${e.date}</span><span>🕐 ${e.submittedAt}</span><span>⏱ ${totH.toFixed(1)}h</span>${codeIssuerLabel?`<span>🎟 By ${codeIssuerLabel}</span>`:''}</div>
+    <div class="ec-meta"><span>📅 ${e.date}</span><span>🕐 ${e.submittedAt}</span>${e.deadline?`<span>⏳ Due ${e.deadline}</span>`:''}<span>⏱ ${totH.toFixed(1)}h</span>${codeIssuerLabel?`<span>🎟 By ${codeIssuerLabel}</span>`:''}</div>
     <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span></div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div></div>`).join('')}</div>
     ${e.gnotes?`<div class="ec-notes">💬 ${e.gnotes}</div>`:''}
     ${e.late&&e.reason?`<div class="ec-reason">📋 ${e.reason}</div>`:''}
@@ -1133,7 +1211,7 @@ function generateCodeString(){
 }
 function openGenCodeModal(ctx){
   genCodeContext=ctx;
-  if(ctx==='manager'&&!canManagerIssueCodes()){toast('Managers can only issue codes 6:30-9 PM.','err');return;}
+  if(ctx==='manager'&&!canManagerIssueCodes()){toast('Managers can only issue codes 2:00–9:00 PM.','err');return;}
   const sel=document.getElementById('gc-staff');
   sel.innerHTML='<option value="">— Select staff —</option><option value="any">Any staff</option>';
   DB.staff.forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=`${a.name} (@${a.username})`;sel.appendChild(o);});
@@ -1176,7 +1254,7 @@ function refreshMgrCodeWindowInfo(){
     el.innerHTML=`<div class="info-banner" style="background:var(--green-b);border-color:rgba(34,197,94,.2);color:var(--green)"><span>✓</span><span>You can issue codes now. Window closes at 9:00 PM.</span></div>`;
     btn.disabled=false;
   }else if(win==='open'){
-    el.innerHTML=`<div class="info-banner"><span>ℹ</span><span>Manager codes can be issued 6:30 PM – 9:00 PM.</span></div>`;
+    el.innerHTML=`<div class="info-banner"><span>ℹ</span><span>Manager codes can be issued 2:00 PM – 9:00 PM.</span></div>`;
     btn.disabled=true;
   }else{
     el.innerHTML=`<div class="info-banner" style="background:var(--red-b);border-color:rgba(239,68,68,.2);color:var(--red)"><span>⛔</span><span>Window closed. Only executive can issue codes now.</span></div>`;
@@ -1564,6 +1642,13 @@ document.querySelectorAll('.modal-ov').forEach(ov=>ov.addEventListener('click',e
 setInterval(()=>{if(document.getElementById('screen-app').classList.contains('active'))syncAll().catch(()=>{});},60000);
 
 init();
+
+// PWA: register the service worker so the app is installable / works offline.
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.warn('SW registration failed',err));
+  });
+}
 </script>
 </body>
 </html>
