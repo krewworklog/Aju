@@ -233,6 +233,23 @@ textarea{resize:vertical;line-height:1.6;}
 .entry-tab:hover{border-color:var(--accent);}
 .entry-tab.active{background:var(--accent-g);border-color:var(--accent);color:var(--accent);}
 .entry-tab .et-sub{display:block;font-size:11px;font-weight:600;margin-top:3px;opacity:.8;}
+/* Tasks */
+.task-card{border:1px solid var(--border2);border-radius:var(--rl);background:var(--s2);padding:14px;margin-bottom:10px;}
+.task-card.done{opacity:.6;}
+.task-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.task-title{font-weight:700;color:var(--ink);font-size:15px;}
+.task-desc{color:var(--ink2);font-size:13px;margin-top:4px;white-space:pre-wrap;}
+.task-meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;font-size:12px;color:var(--ink2);}
+.tag-exec{background:rgba(239,68,68,.15);color:#ef4444;}
+.tag-mgr{background:rgba(79,110,247,.15);color:#4f6ef7;}
+.task-due{font-weight:700;}
+.task-due.overdue{color:#ef4444;}
+.task-note{margin-top:8px;padding:8px 10px;border-radius:var(--r);background:var(--s3);font-size:13px;color:var(--ink);}
+.task-img-link{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:13px;color:var(--accent);text-decoration:none;font-weight:600;}
+.task-done-box{margin-top:10px;padding:10px;border-radius:var(--r);background:var(--s3);}
+.staff-pick{display:flex;flex-wrap:wrap;gap:8px;max-height:180px;overflow:auto;}
+.staff-pick label{display:flex;align-items:center;gap:6px;padding:7px 11px;border:1px solid var(--border2);border-radius:var(--rl);font-size:13px;color:var(--ink2);cursor:pointer;font-weight:600;}
+.staff-pick input:checked+span{color:var(--accent);}
 </style>
 </head>
 <body>
@@ -308,6 +325,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="sbl">My Work</div>
         <div class="nav active" onclick="gp('log',this)"><span class="nav-ic">✏️</span>Log Work</div>
         <div class="nav" onclick="gp('my-logs',this)"><span class="nav-ic">📄</span>My Logs<span class="nbadge" id="b-mylog">0</span></div>
+        <div class="nav" onclick="gp('my-tasks',this)"><span class="nav-ic">✅</span>My Tasks<span class="nbadge amber" id="b-mytasks">0</span></div>
       </div>
       <div id="sb-manager" style="display:none">
         <div class="sbl">Dashboard</div>
@@ -316,6 +334,8 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('mgr-late',this)"><span class="nav-ic">⏳</span>Late Submissions<span class="nbadge amber" id="b-pend">0</span></div>
         <div class="sbl">Weekly Report</div>
         <div class="nav" onclick="gp('mgr-report',this)"><span class="nav-ic">📊</span>Weekly Report<span class="nbadge" id="b-report">●</span></div>
+        <div class="sbl">Tasks</div>
+        <div class="nav" onclick="gp('mgr-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-mgr-tasks">0</span></div>
         <div class="sbl">Approvals</div>
         <div class="nav" onclick="gp('mgr-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-mgr-codes">0</span></div>
         <div class="sbl">Settings</div>
@@ -328,6 +348,8 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-entries',this)"><span class="nav-ic">📋</span>All Logs</div>
         <div class="nav" onclick="gp('exec-clients',this)"><span class="nav-ic">📈</span>By Client</div>
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
+        <div class="sbl">Tasks</div>
+        <div class="nav" onclick="gp('exec-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-exec-tasks">0</span></div>
         <div class="sbl">Reports</div>
         <div class="nav" onclick="gp('exec-reports',this)"><span class="nav-ic">📊</span>Weekly Reports<span class="nbadge" id="b-exec-reports">0</span></div>
         <div class="sbl">Approvals</div>
@@ -540,6 +562,24 @@ textarea{resize:vertical;line-height:1.6;}
         </div>
       </div>
 
+      <!-- STAFF: MY TASKS -->
+      <div class="page" id="page-my-tasks">
+        <div class="ph"><div><div class="pt">My Tasks</div><p class="ps">Tasks assigned to you. Tick when done — add a note and optionally one photo.</p></div></div>
+        <div id="my-tasks-list"></div>
+      </div>
+
+      <!-- MANAGER: TASKS -->
+      <div class="page" id="page-mgr-tasks">
+        <div class="ph"><div><div class="pt">Tasks</div><p class="ps">Assign tasks to staff and track completion.</p></div><button class="btn btn-primary btn-sm" onclick="openTaskModal()">＋ New Task</button></div>
+        <div id="mgr-tasks-list"></div>
+      </div>
+
+      <!-- EXEC: TASKS -->
+      <div class="page" id="page-exec-tasks">
+        <div class="ph"><div><div class="pt">Tasks</div><p class="ps">Assign tasks to staff and track completion.</p></div><button class="btn btn-primary btn-sm" onclick="openTaskModal()">＋ New Task</button></div>
+        <div id="exec-tasks-list"></div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -602,6 +642,22 @@ textarea{resize:vertical;line-height:1.6;}
       </div>
       <div class="modal-ft"><button class="btn btn-primary" onclick="closeModal('gen-code-modal')">Done</button></div>
     </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="task-modal">
+  <div class="modal">
+    <div class="modal-t">New Task</div>
+    <p class="modal-s">Assign a task to one or more staff with a deadline.</p>
+    <div class="fg">
+      <div class="f full"><label>Title *</label><input type="text" id="tk-title" placeholder="e.g. Prepare June campaign brief"/></div>
+      <div class="f full"><label>Description</label><textarea id="tk-desc" style="min-height:60px" placeholder="Details (optional)"></textarea></div>
+      <div class="f"><label>Deadline date *</label><input type="date" id="tk-date"/></div>
+      <div class="f"><label>Deadline time *</label><input type="time" id="tk-time" value="17:00"/></div>
+      <div class="f full"><label>Assign to *</label><div class="staff-pick" id="tk-staff"></div></div>
+    </div>
+    <div class="ferr" id="tk-err" style="display:none;margin-top:8px"></div>
+    <div class="modal-ft"><button class="btn btn-ghost" onclick="closeModal('task-modal')">Cancel</button><button class="btn btn-primary" onclick="createTask()">Create Task</button></div>
   </div>
 </div>
 
@@ -680,7 +736,7 @@ function resetBackend(){
 // ════════════════════════════════════════
 //  STATE (mirror of sheet data)
 // ════════════════════════════════════════
-let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], reports:[], execCode:'99999' };
+let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], reports:[], tasks:[], execCode:'99999' };
 let session = { user:null, role:null };
 let editingId = null;
 let ceCount = 0;
@@ -731,6 +787,8 @@ const ENTRIES=[
 function entryDef(n){return ENTRIES.find(e=>e.num===Number(n))||ENTRIES[0];}
 let currentEntry=1; // which entry the staff is currently logging
 function isLateForEntry(n){return dubaiMinutes()>entryDef(n).deadlineMins;}
+// FEATURE 1: Entry 2 is locked until 2:00 PM Dubai (Entry 1 is always open).
+function entryLocked(n){return Number(n)===2 && dubaiMinutes()<14*60;}
 function isLate(){return isLateForEntry(currentEntry);}
 // Manager-issued codes: from the first deadline (2 PM) until 9 PM; exec after.
 function canManagerIssueCodes(){const m=dubaiMinutes();return m>=14*60 && m<21*60;}
@@ -849,6 +907,9 @@ function gp(id,el){
     'mgr-codes':renderMgrCodesPage,
     'mgr-report':renderMgrReport,
     'my-logs':renderMyLogs,
+    'my-tasks':renderMyTasks,
+    'mgr-tasks':renderAssignerTasks,
+    'exec-tasks':renderAssignerTasks,
     'exec-dash':renderExecDash,
     'exec-entries':()=>{fillClientFilter('ef-client');renderExecEntries();},
     'exec-clients':renderExecClients,
@@ -874,7 +935,7 @@ function initLogForm(){
   editingId=null;
   // Default to the first entry not yet submitted today.
   const done=submittedEntriesToday();
-  setEntry((ENTRIES.find(e=>!done.has(e.num))||ENTRIES[0]).num);
+  setEntry((ENTRIES.find(e=>!done.has(e.num)&&!entryLocked(e.num))||ENTRIES[0]).num);
   updateClock();
 }
 // Which entries the logged-in staff has already submitted today (by entry number).
@@ -885,6 +946,7 @@ function submittedEntriesToday(){
     .map(e=>Number(e.entry)));
 }
 function setEntry(n){
+  if(entryLocked(n)){toast('Entry 2 opens at 2:00 PM (Dubai).','err');return;}
   currentEntry=Number(n);
   document.getElementById('submit-btn').textContent=editingId?'💾 Save Changes':`✔ Submit ${entryDef(currentEntry).label}`;
   renderEntryTabs();
@@ -894,10 +956,11 @@ function renderEntryTabs(){
   if(!document.getElementById('entry-tab-1'))return;
   const done=editingId?new Set():submittedEntriesToday();
   ENTRIES.forEach(e=>{
+    const locked=entryLocked(e.num);
     const btn=document.getElementById('entry-tab-'+e.num);
-    if(btn)btn.classList.toggle('active',e.num===currentEntry);
+    if(btn){btn.classList.toggle('active',e.num===currentEntry);btn.disabled=locked;btn.style.opacity=locked?'.5':'';btn.style.cursor=locked?'not-allowed':'';}
     const sub=document.getElementById('et-sub-'+e.num);
-    if(sub)sub.textContent=done.has(e.num)?'✓ Submitted today':`Due ${e.deadlineLabel}${isLateForEntry(e.num)?' · late':''}`;
+    if(sub)sub.textContent=locked?'🔒 Opens at 2:00 PM':(done.has(e.num)?'✓ Submitted today':`Due ${e.deadlineLabel}${isLateForEntry(e.num)?' · late':''}`);
   });
   const st=document.getElementById('entry-status');
   if(st){
@@ -945,6 +1008,9 @@ async function submitLog(){
     if(!r.client){toast('Select a client for each entry.','err');return;}
     if(!r.hours||r.hours<=0){toast('Enter hours for each entry.','err');return;}
     if(!r.tasks){toast('Enter tasks for each entry.','err');return;}
+  }
+  if(!editingId && entryLocked(currentEntry)){
+    toast('Entry 2 opens at 2:00 PM (Dubai).','err');return;
   }
   if(!editingId && submittedEntriesToday().has(currentEntry)){
     toast(`${entryDef(currentEntry).label} already submitted today — edit it from My Logs.`,'err');return;
@@ -1383,6 +1449,13 @@ function updateBadges(){
   const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
   const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
   const bER=document.getElementById('b-exec-reports');if(bER)bER.textContent=(DB.reports||[]).length;
+  // Task badges: staff = tasks assigned to me & not done; assigner = created by me & not done.
+  const tasks=DB.tasks||[];
+  const myTasks=myId&&session.role==='staff'?tasks.filter(t=>String(t.assignedTo)===String(myId)&&!t.done).length:0;
+  const myAssigned=myId?tasks.filter(t=>String(t.createdById)===String(myId)&&!t.done).length:0;
+  const bMT=document.getElementById('b-mytasks');if(bMT)bMT.textContent=myTasks;
+  const bgMT=document.getElementById('b-mgr-tasks');if(bgMT)bgMT.textContent=myAssigned;
+  const beMT=document.getElementById('b-exec-tasks');if(beMT)beMT.textContent=myAssigned;
   // Report status badge for manager
   const bR=document.getElementById('b-report');
   if(bR){
@@ -1637,6 +1710,183 @@ function toast(msg,type=''){
 }
 
 document.querySelectorAll('.modal-ov').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)closeModal(ov.id);}));
+
+// ════════════════════════════════════════
+//  TASKS (manager/executive → staff)
+// ════════════════════════════════════════
+// POST helper (form-urlencoded → no CORS preflight) for payloads too big for a
+// GET query string, i.e. completing a task with an uploaded image.
+async function apiPost(action,data={}){
+  if(!BACKEND_URL)throw new Error('No backend URL configured');
+  showLoading(true);setSyncStatus('syncing');
+  const body=new URLSearchParams();body.append('action',action);
+  for(const k in data){const v=data[k];body.append(k,typeof v==='object'?JSON.stringify(v):v);}
+  try{
+    const res=await fetch(BACKEND_URL,{method:'POST',body});
+    const json=await res.json();
+    if(json.error)throw new Error(json.error);
+    setSyncStatus('');return json;
+  }catch(err){setSyncStatus('error');throw err;}finally{showLoading(false);}
+}
+
+// Deadline (stored as "YYYY-MM-DDTHH:MM") interpreted in Dubai time (UTC+4).
+function taskDeadlineDate(t){
+  if(!t.deadline)return null;
+  let s=String(t.deadline).trim().replace(' ','T');
+  if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(s))s+=':00+04:00';
+  const d=new Date(s);return isNaN(d.getTime())?null:d;
+}
+function isTaskOverdue(t){const d=taskDeadlineDate(t);return !t.done && d && Date.now()>d.getTime();}
+function fmtDeadline(t){
+  const d=taskDeadlineDate(t);if(!d)return t.deadline||'—';
+  return d.toLocaleString('en-GB',{timeZone:'Asia/Dubai',weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function taskTagHtml(t){
+  return t.createdByRole==='exec'
+    ? `<span class="tag tag-exec">● Executive</span>`
+    : `<span class="tag tag-mgr">● Manager</span>`;
+}
+function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ---- Assigner (manager/exec): create + track ----
+function openTaskModal(){
+  document.getElementById('tk-title').value='';
+  document.getElementById('tk-desc').value='';
+  document.getElementById('tk-date').value=todayStr();
+  document.getElementById('tk-time').value='17:00';
+  document.getElementById('tk-err').style.display='none';
+  const wrap=document.getElementById('tk-staff');
+  wrap.innerHTML=DB.staff.length
+    ? DB.staff.map(a=>`<label><input type="checkbox" class="tk-as" value="${a.id}"><span>${escapeHtml(a.name)}</span></label>`).join('')
+    : '<span style="color:var(--ink3);font-size:13px">No staff accounts yet.</span>';
+  document.getElementById('task-modal').classList.add('show');
+}
+async function createTask(){
+  const title=document.getElementById('tk-title').value.trim();
+  const desc=document.getElementById('tk-desc').value.trim();
+  const date=document.getElementById('tk-date').value;
+  const time=document.getElementById('tk-time').value;
+  const err=document.getElementById('tk-err');err.style.display='none';
+  const picked=Array.from(document.querySelectorAll('.tk-as:checked')).map(c=>c.value);
+  if(!title){err.textContent='Enter a title.';err.style.display='block';return;}
+  if(!date||!time){err.textContent='Pick a deadline date and time.';err.style.display='block';return;}
+  if(!picked.length){err.textContent='Select at least one staff member.';err.style.display='block';return;}
+  const deadline=`${date}T${time}`;
+  try{
+    // One row per assignee, so each staff completes independently.
+    for(const sid of picked){
+      const st=DB.staff.find(a=>String(a.id)===String(sid));
+      await api('addTask',{data:{
+        id:'t'+Date.now()+Math.floor(Math.random()*1000),
+        title,description:desc,
+        assignedTo:sid,assignedToName:st?st.name:sid,
+        createdByRole:session.role,createdById:session.user.id,createdByName:session.user.name,
+        deadline,done:false,doneAt:'',staffNote:'',imageUrl:'',createdAt:new Date().toISOString()
+      }});
+    }
+    closeModal('task-modal');
+    await syncAll();
+    toast(`Task assigned to ${picked.length} staff.`,'ok');
+  }catch(e){err.textContent='Failed: '+e.message;err.style.display='block';}
+}
+async function deleteTask(id){
+  if(!confirm('Delete this task?'))return;
+  try{await api('deleteTask',{id});await syncAll();toast('Task deleted.');}
+  catch(e){toast('Delete failed: '+e.message,'err');}
+}
+function renderAssignerTasks(){
+  const elId=session.role==='exec'?'exec-tasks-list':'mgr-tasks-list';
+  const el=document.getElementById(elId);if(!el)return;
+  const mine=(DB.tasks||[]).filter(t=>String(t.createdById)===String(session.user.id))
+    .sort((a,b)=>(taskDeadlineDate(a)?.getTime()||0)-(taskDeadlineDate(b)?.getTime()||0));
+  if(!mine.length){el.innerHTML=emptyState('🗂','No tasks created yet. Tap “New Task”.');return;}
+  el.innerHTML=mine.map(t=>{
+    const overdue=isTaskOverdue(t);
+    return `<div class="task-card ${t.done?'done':''}">
+      <div class="task-top">
+        <div><div class="task-title">${escapeHtml(t.title)}</div>${t.description?`<div class="task-desc">${escapeHtml(t.description)}</div>`:''}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${taskTagHtml(t)}<span class="tag ${t.done?'t-ok':'t-late'}">${t.done?'✓ Done':'○ Pending'}</span></div>
+      </div>
+      <div class="task-meta">
+        <span>👤 ${escapeHtml(t.assignedToName||t.assignedTo)}</span>
+        <span class="task-due ${overdue?'overdue':''}">⏰ ${fmtDeadline(t)}${overdue?' · OVERDUE':''}</span>
+        ${t.done&&t.doneAt?`<span>✓ ${new Date(t.doneAt).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</span>`:''}
+      </div>
+      ${t.staffNote?`<div class="task-note">📝 ${escapeHtml(t.staffNote)}</div>`:''}
+      ${t.imageUrl?`<a class="task-img-link" href="${encodeURI(t.imageUrl)}" target="_blank" rel="noopener">🖼 View uploaded image</a>`:''}
+      <div style="margin-top:10px"><button class="btn btn-danger btn-xs" onclick="deleteTask('${t.id}')">✕ Delete</button></div>
+    </div>`;
+  }).join('');
+}
+
+// ---- Staff: see + complete ----
+function renderMyTasks(){
+  const el=document.getElementById('my-tasks-list');if(!el)return;
+  const mine=(DB.tasks||[]).filter(t=>String(t.assignedTo)===String(session.user.id))
+    .sort((a,b)=>(a.done-b.done)||((taskDeadlineDate(a)?.getTime()||0)-(taskDeadlineDate(b)?.getTime()||0)));
+  if(!mine.length){el.innerHTML=emptyState('✅','No tasks assigned to you.');return;}
+  el.innerHTML=mine.map(t=>{
+    const overdue=isTaskOverdue(t);
+    return `<div class="task-card ${t.done?'done':''}" id="task-${t.id}">
+      <div class="task-top">
+        <div><div class="task-title">${escapeHtml(t.title)}</div>${t.description?`<div class="task-desc">${escapeHtml(t.description)}</div>`:''}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${taskTagHtml(t)}</div>
+      </div>
+      <div class="task-meta">
+        <span class="task-due ${overdue?'overdue':''}">⏰ ${fmtDeadline(t)}${overdue?' · OVERDUE':''}</span>
+      </div>
+      ${t.done
+        ? `<div class="task-meta"><span class="tag t-ok">✓ Done</span></div>${t.staffNote?`<div class="task-note">📝 ${escapeHtml(t.staffNote)}</div>`:''}${t.imageUrl?`<a class="task-img-link" href="${encodeURI(t.imageUrl)}" target="_blank" rel="noopener">🖼 View your photo</a>`:''}<div style="margin-top:8px"><button class="btn btn-ghost btn-xs" onclick="untickTask('${t.id}')">↩ Mark not done</button></div>`
+        : `<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openDoneBox('${t.id}')">✓ Mark done</button>
+           <div class="task-done-box" id="donebox-${t.id}" style="display:none">
+             <div class="f full"><label>Note (optional)</label><textarea id="dn-note-${t.id}" style="min-height:56px" placeholder="Anything to add…"></textarea></div>
+             <div class="f full"><label>Photo (optional, jpg/png)</label><input type="file" accept="image/jpeg,image/png" id="dn-img-${t.id}"/></div>
+             <div class="ferr" id="dn-err-${t.id}" style="display:none;margin-top:6px"></div>
+             <div style="display:flex;gap:8px;margin-top:10px">
+               <button class="btn btn-ghost btn-sm" onclick="closeDoneBox('${t.id}')">Cancel</button>
+               <button class="btn btn-primary btn-sm" id="dn-go-${t.id}" onclick="submitTaskDone('${t.id}')">Confirm done</button>
+             </div>
+           </div>`}
+    </div>`;
+  }).join('');
+}
+function openDoneBox(id){const b=document.getElementById('donebox-'+id);if(b)b.style.display='block';}
+function closeDoneBox(id){const b=document.getElementById('donebox-'+id);if(b)b.style.display='none';}
+
+// jpg/png → resized JPEG data URL (keeps the upload small).
+function fileToResizedDataUrl(file,maxDim=1280,q=0.7){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();const url=URL.createObjectURL(file);
+    img.onload=()=>{URL.revokeObjectURL(url);let w=img.width,h=img.height;const lo=Math.max(w,h);
+      if(lo>maxDim){const s=maxDim/lo;w=Math.round(w*s);h=Math.round(h*s);}
+      const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(c.toDataURL('image/jpeg',q));};
+    img.onerror=reject;img.src=url;
+  });
+}
+async function submitTaskDone(id){
+  const note=(document.getElementById('dn-note-'+id)||{}).value||'';
+  const fileEl=document.getElementById('dn-img-'+id);
+  const err=document.getElementById('dn-err-'+id);if(err)err.style.display='none';
+  const go=document.getElementById('dn-go-'+id);
+  const file=fileEl&&fileEl.files&&fileEl.files[0];
+  let imageData='',imageType='';
+  if(file){
+    if(!/^image\/(jpeg|png)$/.test(file.type)){if(err){err.textContent='Only jpg or png images are allowed.';err.style.display='block';}return;}
+    try{const durl=await fileToResizedDataUrl(file);imageData=durl.split(',')[1];imageType='image/jpeg';}
+    catch(e){if(err){err.textContent='Could not read the image.';err.style.display='block';}return;}
+  }
+  try{
+    if(go){go.disabled=true;go.textContent='Saving…';}
+    await apiPost('completeTask',{id,done:true,staffNote:note.trim(),imageData,imageType});
+    await syncAll();
+    toast('Task marked done.','ok');
+  }catch(e){if(err){err.textContent='Failed: '+e.message;err.style.display='block';}if(go){go.disabled=false;go.textContent='Confirm done';}}
+}
+async function untickTask(id){
+  try{await apiPost('completeTask',{id,done:false});await syncAll();toast('Task reopened.');}
+  catch(e){toast('Failed: '+e.message,'err');}
+}
 
 // Auto-refresh every 60 seconds while app is open
 setInterval(()=>{if(document.getElementById('screen-app').classList.contains('active'))syncAll().catch(()=>{});},60000);
