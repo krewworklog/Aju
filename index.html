@@ -337,6 +337,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('mgr-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-mgr-tasks">0</span></div>
         <div class="sbl">Approvals</div>
+        <div class="nav" onclick="gp('mgr-review',this)"><span class="nav-ic">☑️</span>Review Entries<span class="nbadge amber" id="b-review">0</span></div>
         <div class="nav" onclick="gp('mgr-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-mgr-codes">0</span></div>
         <div class="sbl">Settings</div>
         <div class="nav" onclick="gp('mgr-staff',this)"><span class="nav-ic">👥</span>Staff Accounts</div>
@@ -348,6 +349,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-entries',this)"><span class="nav-ic">📋</span>All Logs</div>
         <div class="nav" onclick="gp('exec-clients',this)"><span class="nav-ic">📈</span>By Client</div>
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
+        <div class="nav" onclick="gp('exec-compliance',this)"><span class="nav-ic">🚨</span>Compliance<span class="nbadge red" id="b-exec-comp">0</span></div>
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('exec-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-exec-tasks">0</span></div>
         <div class="sbl">Reports</div>
@@ -364,11 +366,11 @@ textarea{resize:vertical;line-height:1.6;}
     <main class="content">
       <!-- STAFF: LOG WORK -->
       <div class="page active" id="page-log">
-        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Log twice a day — Entry 1 by 2:00 PM and Entry 2 by 7:10 PM (Dubai time).</p></div></div>
+        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Log twice a day — Entry 1 by 3:00 PM and Entry 2 by 7:30 PM (Dubai time). Each client entry needs a PNG proof screenshot.</p></div></div>
         <div class="card"><div class="ct">Which entry are you logging?</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap" id="entry-tabs">
-            <button type="button" class="entry-tab" id="entry-tab-1" onclick="setEntry(1)">Entry 1<span class="et-sub" id="et-sub-1">Due 2:00 PM</span></button>
-            <button type="button" class="entry-tab" id="entry-tab-2" onclick="setEntry(2)">Entry 2<span class="et-sub" id="et-sub-2">Due 7:10 PM</span></button>
+            <button type="button" class="entry-tab" id="entry-tab-1" onclick="setEntry(1)">Entry 1<span class="et-sub" id="et-sub-1">Due 3:00 PM</span></button>
+            <button type="button" class="entry-tab" id="entry-tab-2" onclick="setEntry(2)">Entry 2<span class="et-sub" id="et-sub-2">Due 7:30 PM</span></button>
           </div>
           <div id="entry-status" style="margin-top:10px;font-size:13px;color:var(--ink2)"></div>
         </div>
@@ -399,7 +401,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- STAFF: MY LOGS -->
       <div class="page" id="page-my-logs">
-        <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit a log before its own deadline (Entry 1 · 2:00 PM, Entry 2 · 7:10 PM).</p></div></div>
+        <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit a log before its own deadline (Entry 1 · 3:00 PM, Entry 2 · 7:30 PM).</p></div></div>
         <div id="my-logs-list"></div>
       </div>
 
@@ -433,9 +435,16 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="late-list"></div>
       </div>
 
+      <!-- MANAGER: REVIEW ENTRIES -->
+      <div class="page" id="page-mgr-review">
+        <div class="ph"><div><div class="pt">Review Entries</div><p class="ps">Approve or reject each staff entry and its proof screenshot. Reviews lock the next day at 1:00 PM (Dubai) — missed reviews are reported to the executive.</p></div></div>
+        <div class="sg" id="mgr-review-stats"></div>
+        <div id="mgr-review-list"></div>
+      </div>
+
       <!-- MANAGER: CODES -->
       <div class="page" id="page-mgr-codes">
-        <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 2:00 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
+        <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 3:00 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
         <div id="mgr-code-window-info"></div>
         <div class="sg" id="mgr-codes-stats"></div>
         <div class="card"><div class="ct">Codes Issued by You</div>
@@ -515,6 +524,16 @@ textarea{resize:vertical;line-height:1.6;}
       <div class="page" id="page-exec-staff">
         <div class="ph"><div><div class="pt">Staff Analytics</div><p class="ps">Individual performance.</p></div></div>
         <div id="exec-staff-data"></div>
+      </div>
+
+      <!-- EXEC: COMPLIANCE -->
+      <div class="page" id="page-exec-compliance">
+        <div class="ph"><div><div class="pt">Compliance</div><p class="ps">Missed manager reviews (due next day 1:00 PM), staff who missed entries, and all proof screenshots.</p></div></div>
+        <div id="comp-salary-alert"></div>
+        <div class="sg" id="comp-stats"></div>
+        <div class="card"><div class="ct">Missed Reviews — entries the manager never approved in time</div><div id="comp-missed-reviews"></div></div>
+        <div class="card"><div class="ct">Staff Missed Entries — last 7 days</div><div id="comp-missed-entries"></div></div>
+        <div class="card"><div class="ct">Proof of Work Gallery</div><div id="comp-proof-gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px"></div></div>
       </div>
 
       <!-- EXEC: CODES -->
@@ -781,18 +800,54 @@ function nowTime(){return localTime();}
 
 // Two work-log entries per staff per day, each with its own Dubai-time deadline.
 const ENTRIES=[
-  {num:1,label:'Entry 1',deadlineMins:14*60,    deadlineLabel:'2:00 PM'},
-  {num:2,label:'Entry 2',deadlineMins:19*60+10, deadlineLabel:'7:10 PM'},
+  {num:1,label:'Entry 1',deadlineMins:15*60,    deadlineLabel:'3:00 PM'},
+  {num:2,label:'Entry 2',deadlineMins:19*60+30, deadlineLabel:'7:30 PM'},
 ];
 function entryDef(n){return ENTRIES.find(e=>e.num===Number(n))||ENTRIES[0];}
 let currentEntry=1; // which entry the staff is currently logging
 function isLateForEntry(n){return dubaiMinutes()>entryDef(n).deadlineMins;}
-// FEATURE 1: Entry 2 is locked until 2:00 PM Dubai (Entry 1 is always open).
-function entryLocked(n){return Number(n)===2 && dubaiMinutes()<14*60;}
+// FEATURE 1: Entry 2 is locked until the Entry 1 deadline (Entry 1 is always open).
+function entryLocked(n){return Number(n)===2 && dubaiMinutes()<ENTRIES[0].deadlineMins;}
 function isLate(){return isLateForEntry(currentEntry);}
-// Manager-issued codes: from the first deadline (2 PM) until 9 PM; exec after.
-function canManagerIssueCodes(){const m=dubaiMinutes();return m>=14*60 && m<21*60;}
-function timeWindow(){const m=dubaiMinutes();if(m<14*60)return 'open';if(m<21*60)return 'manager';return 'exec';}
+// Manager-issued codes: from the first deadline until 9 PM; exec after.
+function canManagerIssueCodes(){const m=dubaiMinutes();return m>=ENTRIES[0].deadlineMins && m<21*60;}
+function timeWindow(){const m=dubaiMinutes();if(m<ENTRIES[0].deadlineMins)return 'open';if(m<21*60)return 'manager';return 'exec';}
+
+// ════════════════════════════════════════
+//  ENTRY REVIEWS (manager approves each entry + proof by next day 1:00 PM)
+// ════════════════════════════════════════
+const REVIEW_START='2026-07-18'; // entries before this date are exempt (no review needed)
+function entryReview(e){return (e.rows&&e.rows[0]&&e.rows[0]._review)||null;}
+function needsReview(e){return String(e.date)>=REVIEW_START;}
+// Review window closes the day after the entry date at 1:00 PM Dubai.
+function reviewDeadlineDate(e){
+  const d=new Date(e.date+'T13:00:00+04:00');
+  return new Date(d.getTime()+24*3600*1000);
+}
+function reviewDeadlinePassed(e){return Date.now()>reviewDeadlineDate(e).getTime();}
+function reviewState(e){
+  if(!needsReview(e))return 'legacy';
+  const r=entryReview(e);
+  if(r)return r.status==='rejected'?'rejected':'approved';
+  return reviewDeadlinePassed(e)?'missed':'pending';
+}
+function fmtReviewDeadline(e){
+  return reviewDeadlineDate(e).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function reviewTag(e){
+  const s=reviewState(e);const r=entryReview(e);
+  if(s==='legacy')return '';
+  if(s==='approved')return `<span class="tag t-ok" title="${escapeHtml(r&&r.by?'By '+r.by+(r.at?' · '+r.at:''):'')}">☑ Reviewed</span>`;
+  if(s==='rejected')return `<span class="tag t-late" title="${escapeHtml(r?(r.by?'By '+r.by+' · ':'')+(r.note||''):'')}">✕ Rejected</span>`;
+  if(s==='missed')return `<span class="tag t-late">🔒 Review missed</span>`;
+  return `<span class="tag t-pu">⏳ Awaiting review</span>`;
+}
+function proofFileId(url){const m=String(url).match(/[?&]id=([\w-]+)/);return m?m[1]:'';}
+function proofThumbHtml(url){
+  const id=proofFileId(url);
+  const thumb=id?`https://drive.google.com/thumbnail?id=${id}&sz=w400`:url;
+  return `<a href="${encodeURI(url)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px" title="Open proof full size"><img src="${thumb}" alt="Proof" loading="lazy" style="max-width:180px;max-height:120px;border-radius:8px;border:1px solid var(--border);display:block" onerror="this.replaceWith(Object.assign(document.createElement('span'),{textContent:'🖼 View proof'}))"/></a>`;
+}
 
 function updateClock(){
   const clEl=document.getElementById('clock');if(!clEl)return;
@@ -902,6 +957,8 @@ function gp(id,el){
     'mgr-dash':renderMgrDash,
     'mgr-entries':()=>{fillClientFilter('mf-client');renderMgrEntries();},
     'mgr-late':renderLateList,
+    'mgr-review':renderMgrReview,
+    'exec-compliance':renderExecCompliance,
     'mgr-staff':renderStaffTable,
     'mgr-clients':renderClientList,
     'mgr-codes':renderMgrCodesPage,
@@ -946,7 +1003,7 @@ function submittedEntriesToday(){
     .map(e=>Number(e.entry)));
 }
 function setEntry(n){
-  if(entryLocked(n)){toast('Entry 2 opens at 2:00 PM (Dubai).','err');return;}
+  if(entryLocked(n)){toast(`Entry 2 opens at ${ENTRIES[0].deadlineLabel} (Dubai).`,'err');return;}
   currentEntry=Number(n);
   document.getElementById('submit-btn').textContent=editingId?'💾 Save Changes':`✔ Submit ${entryDef(currentEntry).label}`;
   renderEntryTabs();
@@ -960,7 +1017,7 @@ function renderEntryTabs(){
     const btn=document.getElementById('entry-tab-'+e.num);
     if(btn){btn.classList.toggle('active',e.num===currentEntry);btn.disabled=locked;btn.style.opacity=locked?'.5':'';btn.style.cursor=locked?'not-allowed':'';}
     const sub=document.getElementById('et-sub-'+e.num);
-    if(sub)sub.textContent=locked?'🔒 Opens at 2:00 PM':(done.has(e.num)?'✓ Submitted today':`Due ${e.deadlineLabel}${isLateForEntry(e.num)?' · late':''}`);
+    if(sub)sub.textContent=locked?`🔒 Opens at ${ENTRIES[0].deadlineLabel}`:(done.has(e.num)?'✓ Submitted today':`Due ${e.deadlineLabel}${isLateForEntry(e.num)?' · late':''}`);
   });
   const st=document.getElementById('entry-status');
   if(st){
@@ -986,31 +1043,63 @@ function addCE(data){
       <div class="f"><label>Client *</label><select class="cr-cl"></select></div>
       <div class="f"><label>Hours *</label><input type="number" class="cr-hr" min="0.5" max="24" step="0.5" placeholder="e.g. 4"/></div>
       <div class="f full"><label>Tasks Completed *</label><textarea class="cr-tk" placeholder="Describe what you worked on..." style="min-height:70px"></textarea></div>
+      <div class="f full"><label>Proof Screenshot (PNG) *</label><input type="file" class="cr-proof" accept="image/png"/><div class="cr-proof-note" style="font-size:12px;color:var(--ink3);margin-top:4px"></div></div>
     </div>`;
   document.getElementById('ce-wrap').appendChild(div);
   buildClientOpts(div.querySelector('.cr-cl'),data?data.client:'');
-  if(data){div.querySelector('.cr-hr').value=data.hours;div.querySelector('.cr-tk').value=data.tasks;}
+  if(data){
+    div.querySelector('.cr-hr').value=data.hours;div.querySelector('.cr-tk').value=data.tasks;
+    if(data.proofImg){
+      div.dataset.proofUrl=data.proofImg;
+      div.querySelector('.cr-proof-note').innerHTML=`✓ Proof already uploaded — <a href="${encodeURI(data.proofImg)}" target="_blank" rel="noopener" style="color:var(--accent)">view</a>. Choose a new file only to replace it.`;
+    }
+  }
 }
 function getCERows(){
   return Array.from(document.querySelectorAll('.ce-row')).map(row=>({
     client:row.querySelector('.cr-cl').value,
     hours:parseFloat(row.querySelector('.cr-hr').value)||0,
-    tasks:row.querySelector('.cr-tk').value.trim()
+    tasks:row.querySelector('.cr-tk').value.trim(),
+    proofImg:row.dataset.proofUrl||'',
+    _file:(row.querySelector('.cr-proof').files||[])[0]||null
   }));
+}
+// Reads each row's chosen PNG → resized JPEG base64 for upload; returns
+// {rows, proofs} where rows are clean (no File objects) and proofs go to Drive.
+async function collectRowsAndProofs(){
+  const raw=getCERows();
+  const rows=[],proofs=[];
+  for(let i=0;i<raw.length;i++){
+    const r=raw[i];
+    const row={client:r.client,hours:r.hours,tasks:r.tasks};
+    if(r.proofImg)row.proofImg=r.proofImg;
+    if(r._file){
+      if(r._file.type!=='image/png')throw new Error(`Entry #${i+1}: proof must be a PNG image.`);
+      const durl=await fileToResizedDataUrl(r._file);
+      proofs.push({i,imageData:durl.split(',')[1],imageType:'image/jpeg'});
+    }
+    rows.push(row);
+  }
+  return {rows,proofs};
 }
 
 async function submitLog(){
   const date=document.getElementById('f-date').value;
   const gnotes=document.getElementById('f-gnotes').value.trim();
-  const rows=getCERows();
+  const rawRows=getCERows();
   if(!date){toast('Please select a date.','err');return;}
-  for(const r of rows){
+  for(let i=0;i<rawRows.length;i++){
+    const r=rawRows[i];
     if(!r.client){toast('Select a client for each entry.','err');return;}
     if(!r.hours||r.hours<=0){toast('Enter hours for each entry.','err');return;}
     if(!r.tasks){toast('Enter tasks for each entry.','err');return;}
+    if(!r._file&&!r.proofImg){toast(`Entry #${i+1}: upload a PNG proof screenshot of the work done.`,'err');return;}
   }
+  let rows,proofs;
+  try {({rows,proofs}=await collectRowsAndProofs());}
+  catch(e){toast(e.message,'err');return;}
   if(!editingId && entryLocked(currentEntry)){
-    toast('Entry 2 opens at 2:00 PM (Dubai).','err');return;
+    toast(`Entry 2 opens at ${ENTRIES[0].deadlineLabel} (Dubai).`,'err');return;
   }
   if(!editingId && submittedEntriesToday().has(currentEntry)){
     toast(`${entryDef(currentEntry).label} already submitted today — edit it from My Logs.`,'err');return;
@@ -1039,10 +1128,10 @@ async function submitLog(){
   const submittedAt=nowTime();
   try {
     if(editingId){
-      await api('updateEntry',{data:{id:editingId,staffId,staffName,date,gnotes,rows,late:false,reason:'',approved:false,submittedAt,usedCodeId:'',editedAt:submittedAt,entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel}});
+      await apiPost('updateEntry',{data:{id:editingId,staffId,staffName,date,gnotes,rows,late:false,reason:'',approved:false,submittedAt,usedCodeId:'',editedAt:submittedAt,entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel},proofs});
       toast('Entry updated!','ok');
     } else {
-      await api('addEntry',{data:{id:'e'+Date.now(),staffId,staffName,date,gnotes,rows,late,reason,approved,submittedAt,usedCodeId,editedAt:'',entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel}});
+      await apiPost('addEntry',{data:{id:'e'+Date.now(),staffId,staffName,date,gnotes,rows,late,reason,approved,submittedAt,usedCodeId,editedAt:'',entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel},proofs});
       toast(`${entryDef(currentEntry).label} submitted!`,'ok');
     }
     await syncAll();
@@ -1088,13 +1177,18 @@ function entryCard(e,isOwner){
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${entryLabel?`<span class="tag t-pu">${entryLabel}</span>`:''}
         <span class="tag ${e.late?'t-late':'t-ok'}">${e.late?'⚠ Late (approved)':'✓ On time'}</span>
+        ${reviewTag(e)}
         ${e.editedAt?`<span class="tag t-pu" style="font-size:10px">✏ Edited</span>`:''}
       </div>
     </div>
     <div class="ec-meta"><span>📅 ${e.date}</span><span>🕐 ${e.submittedAt}</span>${e.deadline?`<span>⏳ Due ${e.deadline}</span>`:''}<span>⏱ ${totH.toFixed(1)}h</span>${codeIssuerLabel?`<span>🎟 By ${codeIssuerLabel}</span>`:''}</div>
-    <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span></div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div></div>`).join('')}</div>
+    <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span></div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div>${r.proofImg?proofThumbHtml(r.proofImg):''}</div>`).join('')}</div>
     ${e.gnotes?`<div class="ec-notes">💬 ${e.gnotes}</div>`:''}
     ${e.late&&e.reason?`<div class="ec-reason">📋 ${e.reason}</div>`:''}
+    ${(()=>{const r=entryReview(e);if(!r)return '';
+      return r.status==='rejected'
+        ?`<div class="ec-reason" style="color:var(--red)">✕ Rejected by ${escapeHtml(r.by||'manager')}${r.at?' on '+r.at:''}${r.note?' — '+escapeHtml(r.note):''}</div>`
+        :`<div class="ec-notes" style="color:var(--green)">☑ Approved by ${escapeHtml(r.by||'manager')}${r.at?' on '+r.at:''}</div>`;})()}
     ${canEdit?`<div class="ec-acts"><button class="btn btn-ghost btn-sm" onclick="editEntry('${e.id}')">✏ Edit</button><button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">✕ Delete</button></div>`:''}
   </div>`;
 }
@@ -1145,6 +1239,116 @@ function renderMgrEntries(){
 function renderLateList(){
   const late=DB.entries.filter(e=>e.late).reverse();
   document.getElementById('late-list').innerHTML=late.length?late.map(e=>entryCard(e,false)).join(''):emptyState('✅','No late submissions yet.');
+}
+
+// ════════════════════════════════════════
+//  MANAGER: REVIEW ENTRIES
+// ════════════════════════════════════════
+function unreviewedEntries(){return DB.entries.filter(e=>needsReview(e)&&!entryReview(e));}
+function missedReviewEntries(){return unreviewedEntries().filter(e=>reviewDeadlinePassed(e));}
+function renderMgrReview(){
+  const pending=unreviewedEntries().filter(e=>!reviewDeadlinePassed(e));
+  const missed=missedReviewEntries();
+  const reviewed=DB.entries.filter(e=>needsReview(e)&&entryReview(e));
+  document.getElementById('mgr-review-stats').innerHTML=`
+    <div class="sc"><div class="sl">To Review</div><div class="sv sv-am">${pending.length}</div><div class="ss">locks next day 1:00 PM</div></div>
+    <div class="sc"><div class="sl">Reviewed</div><div class="sv sv-gr">${reviewed.length}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Missed</div><div class="sv" style="color:var(--red)">${missed.length}</div><div class="ss">locked · reported to exec</div></div>`;
+  const el=document.getElementById('mgr-review-list');
+  let html=pending.length?[...pending].reverse().map(e=>`
+    <div>${entryCard(e,false)}
+      <div style="display:flex;gap:8px;margin:-8px 0 16px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--ink3)">⏳ Review by ${fmtReviewDeadline(e)}</span>
+        <span style="flex:1"></span>
+        <button class="btn btn-primary btn-sm" onclick="reviewEntryAction('${e.id}','approved')">☑ Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="reviewEntryAction('${e.id}','rejected')">✕ Reject</button>
+      </div>
+    </div>`).join(''):emptyState('☑️','Nothing awaiting review.');
+  if(missed.length){
+    html+=`<div class="ct" style="margin-top:1.5rem;color:var(--red)">Missed — review window closed (reported to executive)</div>`
+      +[...missed].reverse().map(e=>entryCard(e,false)).join('');
+  }
+  el.innerHTML=html;
+}
+async function reviewEntryAction(id,status){
+  const e=DB.entries.find(x=>String(x.id)===String(id));if(!e)return;
+  if(reviewDeadlinePassed(e)){toast('Review window closed (next day 1:00 PM). This entry is now reported to the executive.','err');renderMgrReview();return;}
+  let note='';
+  if(status==='rejected'){
+    note=(prompt('Reason for rejecting this entry:')||'').trim();
+    if(!note){toast('Rejection needs a reason.','err');return;}
+  } else if(!confirm('Approve this entry and its proof?'))return;
+  try{
+    await api('reviewEntry',{id,status,by:session.user.name,note,at:todayStr()+' '+nowTime()});
+    await syncAll();renderMgrReview();
+    toast(status==='approved'?'Entry approved.':'Entry rejected.','ok');
+  }catch(err){toast('Failed: '+err.message,'err');}
+}
+
+// ════════════════════════════════════════
+//  EXEC: COMPLIANCE
+// ════════════════════════════════════════
+function missedReviewDates(){return [...new Set(missedReviewEntries().map(e=>String(e.date)))].sort();}
+// Two consecutive missed days = one −100 AED cut (non-overlapping pairs).
+function salaryCutPairs(){
+  const dates=missedReviewDates();const pairs=[];let i=0;
+  while(i<dates.length-1){
+    const gap=new Date(dates[i+1]+'T00:00:00Z')-new Date(dates[i]+'T00:00:00Z');
+    if(gap===86400000){pairs.push([dates[i],dates[i+1]]);i+=2;}else i++;
+  }
+  return pairs;
+}
+function allProofs(){
+  const out=[];
+  [...DB.entries].reverse().forEach(e=>(e.rows||[]).forEach(r=>{
+    if(r.proofImg)out.push({e,staffName:e.staffName,date:e.date,client:r.client,hours:r.hours,url:r.proofImg});
+  }));
+  return out;
+}
+function renderExecCompliance(){
+  const missed=missedReviewEntries();
+  const dates=missedReviewDates();
+  const pairs=salaryCutPairs();
+  const proofs=allProofs();
+  const al=document.getElementById('comp-salary-alert');
+  if(pairs.length){
+    al.innerHTML=`<div class="info-banner" style="background:var(--red-b);border-color:rgba(239,68,68,.3);color:var(--red);margin-bottom:1.25rem;padding:14px 18px;font-size:13px;display:block">
+      <strong>⚠ Manager salary cut — reviews missed 2 days in a row.</strong>
+      <div style="margin-top:8px">${pairs.map(p=>`<div>• ${p[0]} &amp; ${p[1]} — entries left unreviewed past 1:00 PM → <strong>−100 AED</strong></div>`).join('')}</div>
+      <div style="margin-top:8px">Total: <strong>−${pairs.length*100} AED</strong></div>
+    </div>`;
+  } else if(dates.length){
+    al.innerHTML=`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1.25rem;padding:14px 18px;font-size:13px"><span>⏱</span><span>Reviews were missed on <strong>${dates.join(', ')}</strong>. Two consecutive missed days = −100 AED salary cut.</span></div>`;
+  } else al.innerHTML='';
+  document.getElementById('comp-stats').innerHTML=`
+    <div class="sc"><div class="sl">Missed Reviews</div><div class="sv" style="color:var(--red)">${missed.length}</div><div class="ss">entries</div></div>
+    <div class="sc"><div class="sl">Missed Days</div><div class="sv sv-am">${dates.length}</div><div class="ss">${dates.length?'latest '+dates[dates.length-1]:'—'}</div></div>
+    <div class="sc"><div class="sl">Salary Cuts</div><div class="sv" style="color:var(--red)">${pairs.length?'−'+pairs.length*100+' AED':'0'}</div><div class="ss">2-day streaks</div></div>
+    <div class="sc"><div class="sl">Proofs</div><div class="sv sv-ac">${proofs.length}</div><div class="ss">uploaded</div></div>`;
+  document.getElementById('comp-missed-reviews').innerHTML=missed.length
+    ?[...missed].reverse().map(e=>entryCard(e,false)).join('')
+    :'<p style="font-size:13px;color:var(--ink3);padding:.5rem 0">No missed reviews.</p>';
+  // Staff who missed entries — past 7 days, feature launch onwards.
+  const daysOut=[];
+  for(let i=1;i<=7;i++){
+    const date=localDateStr(new Date(Date.now()-i*86400000));
+    if(date<REVIEW_START)break;
+    const short=DB.staff.map(s=>({name:s.name,count:DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length}))
+      .filter(x=>x.count<2);
+    if(short.length)daysOut.push({date,short});
+  }
+  document.getElementById('comp-missed-entries').innerHTML=daysOut.length?daysOut.map(d=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-family:var(--font);font-weight:800;font-size:13px">${d.date}</div>
+      <div style="font-size:12px;color:var(--ink3);margin-top:4px">${d.short.map(x=>`${escapeHtml(x.name)} — ${x.count===0?'❌ no entries':'⚠ 1 of 2 entries'}`).join(' &nbsp;·&nbsp; ')}</div>
+    </div>`).join(''):'<p style="font-size:13px;color:var(--ink3);padding:.5rem 0">Everyone submitted both entries.</p>';
+  document.getElementById('comp-proof-gallery').innerHTML=proofs.length?proofs.map(p=>`
+    <div style="border:1px solid var(--border);border-radius:10px;padding:10px">
+      <div style="font-family:var(--font);font-weight:800;font-size:13px">${escapeHtml(p.staffName)}</div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:2px">${p.date} · ${escapeHtml(p.client)} · ${p.hours}h</div>
+      ${proofThumbHtml(p.url)}
+      <div style="margin-top:6px">${reviewTag(p.e)}</div>
+    </div>`).join(''):'<p style="font-size:13px;color:var(--ink3)">No proofs uploaded yet.</p>';
 }
 
 function renderStaffTable(){
@@ -1409,11 +1613,12 @@ function renderExecStaff(){
 
 function exportCSV(){
   if(!DB.entries.length){toast('Nothing to export.','err');return;}
-  const rows=[['Staff','Username','Date','Time','Client','Hours','Tasks','Notes','Status','Reason','Code','Issued By']];
+  const rows=[['Staff','Username','Date','Time','Client','Hours','Tasks','Notes','Status','Reason','Code','Issued By','Proof','Review','Reviewed By']];
   DB.entries.forEach(e=>{
     const code=e.usedCodeId?DB.codes.find(c=>String(c.id)===String(e.usedCodeId)):null;
+    const rv=entryReview(e);const rs=reviewState(e);
     (e.rows||[]).forEach(r=>{
-      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${code?code.code:''}"`,`"${code?(code.issuedByRole==='exec'?'Executive':code.issuedByName):''}"`]);
+      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${code?code.code:''}"`,`"${code?(code.issuedByRole==='exec'?'Executive':code.issuedByName):''}"`,`"${r.proofImg||''}"`,rs==='legacy'?'':rs.charAt(0).toUpperCase()+rs.slice(1),`"${rv?rv.by||'':''}"`]);
     });
   });
   const csv=rows.map(r=>r.join(',')).join('\n');
@@ -1446,6 +1651,8 @@ function updateBadges(){
   const bm=document.getElementById('b-mylog');if(bm)bm.textContent=myCount;
   const bM=document.getElementById('b-mgr');if(bM)bM.textContent=total;
   const bP=document.getElementById('b-pend');if(bP)bP.textContent=lateCount;
+  const bRv=document.getElementById('b-review');if(bRv)bRv.textContent=unreviewedEntries().filter(e=>!reviewDeadlinePassed(e)).length;
+  const bComp=document.getElementById('b-exec-comp');if(bComp)bComp.textContent=missedReviewEntries().length;
   const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
   const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
   const bER=document.getElementById('b-exec-reports');if(bER)bER.textContent=(DB.reports||[]).length;
