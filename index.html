@@ -437,7 +437,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- MANAGER: REVIEW ENTRIES -->
       <div class="page" id="page-mgr-review">
-        <div class="ph"><div><div class="pt">Review Entries</div><p class="ps">Approve or reject each staff entry and its proof screenshot. Reviews lock the next day at 1:00 PM (Dubai) — missed reviews are reported to the executive.</p></div></div>
+        <div class="ph"><div><div class="pt">Review Entries</div><p class="ps">Approve or reject each staff entry and its proof screenshot. Reviews lock the next working day at 1:00 PM (Dubai; Sundays off, so Saturday entries lock Monday) — missed reviews are reported to the executive.</p></div></div>
         <div class="sg" id="mgr-review-stats"></div>
         <div id="mgr-review-list"></div>
       </div>
@@ -827,10 +827,12 @@ function timeWindow(){const m=dubaiMinutes();if(m<ENTRIES[0].deadlineMins)return
 const REVIEW_START='2026-07-18'; // entries before this date are exempt (no review needed)
 function entryReview(e){return (e.rows&&e.rows[0]&&e.rows[0]._review)||null;}
 function needsReview(e){return String(e.date)>=REVIEW_START;}
-// Review window closes the day after the entry date at 1:00 PM Dubai.
+// Review window closes the next working day at 1:00 PM Dubai.
+// Sunday is the day off, so Saturday entries are due for review Monday 1:00 PM.
 function reviewDeadlineDate(e){
-  const d=new Date(e.date+'T13:00:00+04:00');
-  return new Date(d.getTime()+24*3600*1000);
+  let d=new Date(new Date(e.date+'T13:00:00+04:00').getTime()+24*3600*1000);
+  if(new Date(d.getTime()+4*3600*1000).getUTCDay()===0)d=new Date(d.getTime()+24*3600*1000);
+  return d;
 }
 function reviewDeadlinePassed(e){return Date.now()>reviewDeadlineDate(e).getTime();}
 function reviewState(e){
@@ -1297,12 +1299,18 @@ async function reviewEntryAction(id,status){
 //  EXEC: COMPLIANCE
 // ════════════════════════════════════════
 function missedReviewDates(){return [...new Set(missedReviewEntries().map(e=>String(e.date)))].sort();}
-// Two consecutive missed days = one −100 AED cut (non-overlapping pairs).
+// Two consecutive missed working days = one −100 AED cut (non-overlapping
+// pairs). Saturday and Monday count as consecutive — Sunday is the day off.
+function consecutiveWorkdays(d1,d2){
+  const a=new Date(d1+'T00:00:00Z'),b=new Date(d2+'T00:00:00Z');
+  const gap=(b-a)/86400000;
+  if(gap===1)return true;
+  return gap===2&&new Date(a.getTime()+86400000).getUTCDay()===0;
+}
 function salaryCutPairs(){
   const dates=missedReviewDates();const pairs=[];let i=0;
   while(i<dates.length-1){
-    const gap=new Date(dates[i+1]+'T00:00:00Z')-new Date(dates[i]+'T00:00:00Z');
-    if(gap===86400000){pairs.push([dates[i],dates[i+1]]);i+=2;}else i++;
+    if(consecutiveWorkdays(dates[i],dates[i+1])){pairs.push([dates[i],dates[i+1]]);i+=2;}else i++;
   }
   return pairs;
 }
