@@ -532,7 +532,14 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="comp-salary-alert"></div>
         <div class="sg" id="comp-stats"></div>
         <div class="card"><div class="ct">Missed Reviews — entries the manager never approved in time</div><div id="comp-missed-reviews"></div></div>
-        <div class="card"><div class="ct">Staff Missed Entries — last 7 days</div><div id="comp-missed-entries"></div></div>
+        <div class="card"><div class="ct">Staff Missed Entries</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <label style="font-size:12px;color:var(--ink3)">From</label><input type="date" id="cme-from" onchange="renderCompMissed()" style="width:auto"/>
+            <label style="font-size:12px;color:var(--ink3)">To</label><input type="date" id="cme-to" onchange="renderCompMissed()" style="width:auto"/>
+          </div>
+          <div id="comp-missed-summary" style="margin-bottom:14px"></div>
+          <div id="comp-missed-entries"></div>
+        </div>
         <div class="card"><div class="ct">Proof of Work Gallery</div><div id="comp-proof-gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px"></div></div>
       </div>
 
@@ -1328,20 +1335,53 @@ function renderExecCompliance(){
   document.getElementById('comp-missed-reviews').innerHTML=missed.length
     ?[...missed].reverse().map(e=>entryCard(e,false)).join('')
     :'<p style="font-size:13px;color:var(--ink3);padding:.5rem 0">No missed reviews.</p>';
-  // Staff who missed entries — past 7 days, feature launch onwards.
-  const daysOut=[];
-  for(let i=1;i<=7;i++){
-    const date=localDateStr(new Date(Date.now()-i*86400000));
-    if(date<REVIEW_START)break;
-    const short=DB.staff.map(s=>({name:s.name,count:DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length}))
-      .filter(x=>x.count<2);
-    if(short.length)daysOut.push({date,short});
+  renderCompMissed();
+  renderProofGalleryList(proofs);
+}
+// Staff missed-entries report over a chosen date range (defaults: 1st of the
+// current month → yesterday). A day counts against staff who existed then.
+function renderCompMissed(){
+  const fromEl=document.getElementById('cme-from'),toEl=document.getElementById('cme-to');
+  if(!fromEl||!toEl)return;
+  if(!fromEl.value)fromEl.value=todayStr().slice(0,8)+'01';
+  if(!toEl.value)toEl.value=localDateStr(new Date(Date.now()-86400000));
+  const from=fromEl.value,to=toEl.value;
+  const days=[];
+  let cur=from;
+  while(cur<=to&&days.length<93){
+    days.push(cur);
+    cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   }
-  document.getElementById('comp-missed-entries').innerHTML=daysOut.length?daysOut.map(d=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="font-family:var(--font);font-weight:800;font-size:13px">${d.date}</div>
+  const staffRows=DB.staff.map(s=>({s,full:[],partial:[]}));
+  days.forEach(date=>{
+    staffRows.forEach(r=>{
+      if(r.s.createdAt&&String(r.s.createdAt).slice(0,10)>date)return;
+      const n=DB.entries.filter(e=>String(e.staffId)===String(r.s.id)&&String(e.date)===date).length;
+      if(n===0)r.full.push(date);else if(n===1)r.partial.push(date);
+    });
+  });
+  const sumEl=document.getElementById('comp-missed-summary');
+  sumEl.innerHTML=DB.staff.length?`
+    <table class="stbl"><thead><tr><th>Staff</th><th>Days fully missed</th><th>Days with 1 of 2</th><th>Missed dates</th></tr></thead><tbody>
+    ${staffRows.map(r=>`<tr>
+      <td style="font-family:var(--font);font-weight:800">${escapeHtml(r.s.name)}</td>
+      <td><span class="tag ${r.full.length?'t-late':'t-ok'}">${r.full.length}</span></td>
+      <td><span class="tag ${r.partial.length?'t-pu':'t-ok'}">${r.partial.length}</span></td>
+      <td style="font-size:11px;color:var(--ink3);max-width:340px">${[...r.full.map(d=>d+' (none)'),...r.partial.map(d=>d+' (1 of 2)')].sort().join(', ')||'—'}</td>
+    </tr>`).join('')}
+    </tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
+  const daysOut=days.map(date=>({date,
+    short:staffRows.filter(r=>r.full.includes(date)||r.partial.includes(date))
+      .map(r=>({name:r.s.name,count:r.full.includes(date)?0:1}))
+  })).filter(d=>d.short.length);
+  document.getElementById('comp-missed-entries').innerHTML=daysOut.length?daysOut.map(d=>{
+    const wd=new Date(d.date+'T00:00:00+04:00').toLocaleDateString('en-GB',{weekday:'short',timeZone:'Asia/Dubai'});
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-family:var(--font);font-weight:800;font-size:13px">${d.date} <span style="color:var(--ink3);font-weight:400">(${wd})</span></div>
       <div style="font-size:12px;color:var(--ink3);margin-top:4px">${d.short.map(x=>`${escapeHtml(x.name)} — ${x.count===0?'❌ no entries':'⚠ 1 of 2 entries'}`).join(' &nbsp;·&nbsp; ')}</div>
-    </div>`).join(''):'<p style="font-size:13px;color:var(--ink3);padding:.5rem 0">Everyone submitted both entries.</p>';
+    </div>`;}).join(''):'<p style="font-size:13px;color:var(--ink3);padding:.5rem 0">Everyone submitted both entries in this range.</p>';
+}
+function renderProofGalleryList(proofs){
   document.getElementById('comp-proof-gallery').innerHTML=proofs.length?proofs.map(p=>`
     <div style="border:1px solid var(--border);border-radius:10px;padding:10px">
       <div style="font-family:var(--font);font-weight:800;font-size:13px">${escapeHtml(p.staffName)}</div>
