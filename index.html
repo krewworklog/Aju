@@ -772,10 +772,30 @@ let loginRole = 'staff';
 let lastGeneratedCode = null;
 let genCodeContext = null;
 
+// Google Sheets auto-converts date strings in cells to Date values, which the
+// backend serialises as ISO timestamps (e.g. "2026-07-17T20:00:00.000Z" for
+// midnight Jul 18 Dubai). Convert those back to plain Dubai-date strings so
+// all e.date comparisons work.
+function normDate(v){
+  if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)){
+    const d=new Date(v);
+    if(!isNaN(d.getTime()))return localDateStr(d);
+  }
+  return v;
+}
+function normalizeDB(db){
+  (db.entries||[]).forEach(e=>{e.date=normDate(e.date);});
+  (db.staff||[]).forEach(s=>{s.createdAt=normDate(s.createdAt);});
+  (db.managers||[]).forEach(m=>{m.createdAt=normDate(m.createdAt);});
+  (db.reports||[]).forEach(r=>{r.weekStart=normDate(r.weekStart);r.weekEnd=normDate(r.weekEnd);});
+  (db.codes||[]).forEach(c=>{c.generatedDate=normDate(c.generatedDate);});
+}
+
 async function syncAll(){
   try {
     const data = await api('getAll');
     DB = data;
+    normalizeDB(DB);
     updateBadges();
     // Re-render current page if app is open
     if(document.getElementById('screen-app').classList.contains('active')){

@@ -115,13 +115,25 @@ function sheetToObjects(sh) {
   });
 }
 
+// Sheets auto-converts date strings in cells to Date values; send them back
+// as plain yyyy-MM-dd strings (in the spreadsheet's timezone) so the frontend
+// can compare them.
+function dateCellToString(v, tz) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+  }
+  return v;
+}
+
 function getAll(ss) {
-  const staff = sheetToObjects(ss.getSheetByName('staff'));
-  const managers = sheetToObjects(ss.getSheetByName('managers'));
+  const tz = ss.getSpreadsheetTimeZone();
+  const staff = sheetToObjects(ss.getSheetByName('staff')).map(s => ({ ...s, createdAt: dateCellToString(s.createdAt, tz) }));
+  const managers = sheetToObjects(ss.getSheetByName('managers')).map(m => ({ ...m, createdAt: dateCellToString(m.createdAt, tz) }));
   const clients = sheetToObjects(ss.getSheetByName('clients')).map(c => c.name);
   const rawEntries = sheetToObjects(ss.getSheetByName('entries'));
   const entries = rawEntries.map(e => ({
     ...e,
+    date: dateCellToString(e.date, tz),
     rows: e.rows ? JSON.parse(e.rows) : [],
     late: e.late === true || e.late === 'TRUE' || e.late === 'true',
     approved: e.approved === true || e.approved === 'TRUE' || e.approved === 'true'
@@ -134,6 +146,8 @@ function getAll(ss) {
   const rawReports = sheetToObjects(ss.getSheetByName('reports'));
   const reports = rawReports.map(r => ({
     ...r,
+    weekStart: dateCellToString(r.weekStart, tz),
+    weekEnd: dateCellToString(r.weekEnd, tz),
     breakdown: r.breakdown ? (typeof r.breakdown === 'string' ? JSON.parse(r.breakdown) : r.breakdown) : [],
     totalHours: parseFloat(r.totalHours) || 0
   }));
