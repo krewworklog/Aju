@@ -16,6 +16,7 @@ const SHEETS = {
   codes:    ['id', 'code', 'staffId', 'staffName', 'note', 'issuedByRole', 'issuedById', 'issuedByName', 'generatedAt', 'generatedDate', 'generatedTime', 'used', 'usedBy', 'usedByName', 'usedAt'],
   reports:  ['id', 'weekStart', 'weekEnd', 'submittedAt', 'submittedBy', 'submittedById', 'breakdown', 'note', 'totalHours'],
   tasks:    ['id', 'title', 'description', 'assignedTo', 'assignedToName', 'createdByRole', 'createdById', 'createdByName', 'deadline', 'done', 'doneAt', 'staffNote', 'imageUrl', 'createdAt'],
+  leads:    ['id', 'targetId', 'staffId', 'staffName', 'f1', 'f2', 'f3', 'success', 'createdAt'],
   config:   ['key', 'value']
 };
 
@@ -56,6 +57,9 @@ function handleRequest(e) {
       case 'addTask':      result = addRow(ss, 'tasks', JSON.parse(params.data)); break;
       case 'deleteTask':   result = deleteRow(ss, 'tasks', params.id); break;
       case 'completeTask': result = completeTask(ss, params); break;
+      case 'addLead':      result = addRow(ss, 'leads', JSON.parse(params.data)); break;
+      case 'setLeadSuccess': result = updateField(ss, 'leads', params.id, 'success', params.value === 'true'); break;
+      case 'deleteLead':   result = deleteRow(ss, 'leads', params.id); break;
       case 'setExecCode':  result = setConfig(ss, 'execCode', params.value); break;
       default: result = { error: 'Unknown action' };
     }
@@ -156,9 +160,15 @@ function getAll(ss) {
     ...t,
     done: t.done === true || t.done === 'TRUE' || t.done === 'true'
   }));
+  const rawLeads = sheetToObjects(ss.getSheetByName('leads'));
+  const leads = rawLeads.map(l => ({
+    ...l,
+    createdAt: dateCellToString(l.createdAt, tz),
+    success: l.success === true || l.success === 'TRUE' || l.success === 'true'
+  }));
   const config = sheetToObjects(ss.getSheetByName('config'));
   const execCode = (config.find(c => c.key === 'execCode') || {}).value || DEFAULT_EXEC_CODE;
-  return { staff, managers, clients, entries, codes, reports, tasks, execCode: String(execCode) };
+  return { staff, managers, clients, entries, codes, reports, tasks, leads, execCode: String(execCode) };
 }
 
 function addRow(ss, sheetName, obj) {

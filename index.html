@@ -326,6 +326,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav active" onclick="gp('log',this)"><span class="nav-ic">✏️</span>Log Work</div>
         <div class="nav" onclick="gp('my-logs',this)"><span class="nav-ic">📄</span>My Logs<span class="nbadge" id="b-mylog">0</span></div>
         <div class="nav" onclick="gp('my-tasks',this)"><span class="nav-ic">✅</span>My Tasks<span class="nbadge amber" id="b-mytasks">0</span></div>
+        <div class="nav" onclick="gp('my-targets',this)"><span class="nav-ic">🎯</span>My Targets<span class="nbadge purple" id="b-mytargets">0</span></div>
       </div>
       <div id="sb-manager" style="display:none">
         <div class="sbl">Dashboard</div>
@@ -350,6 +351,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-clients',this)"><span class="nav-ic">📈</span>By Client</div>
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
         <div class="nav" onclick="gp('exec-compliance',this)"><span class="nav-ic">🚨</span>Compliance<span class="nbadge red" id="b-exec-comp">0</span></div>
+        <div class="nav" onclick="gp('exec-salary',this)"><span class="nav-ic">💰</span>Salary</div>
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('exec-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-exec-tasks">0</span></div>
         <div class="sbl">Reports</div>
@@ -403,6 +405,12 @@ textarea{resize:vertical;line-height:1.6;}
       <div class="page" id="page-my-logs">
         <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit a log before its own deadline (Entry 1 · 3:00 PM, Entry 2 · 7:30 PM).</p></div></div>
         <div id="my-logs-list"></div>
+      </div>
+
+      <!-- STAFF: LEAD TARGETS -->
+      <div class="page" id="page-my-targets">
+        <div class="ph"><div><div class="pt">My Lead Targets</div><p class="ps">Log every lead you contact, then tick the box when it becomes a successful enquiry. Reach the goal before month end — missing it means a 5% salary reduction.</p></div></div>
+        <div id="my-targets-wrap"></div>
       </div>
 
       <!-- MANAGER: OVERVIEW -->
@@ -542,6 +550,19 @@ textarea{resize:vertical;line-height:1.6;}
           <div id="comp-missed-entries"></div>
         </div>
         <div class="card"><div class="ct">Proof of Work Gallery</div><div id="comp-proof-gallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px"></div></div>
+      </div>
+
+      <!-- EXEC: SALARY -->
+      <div class="page" id="page-exec-salary">
+        <div class="ph"><div><div class="pt">Salary & Compliance</div><p class="ps">Monthly salary per staff after deductions — 50 AED per missed entry (from August 2026) and 5% for a missed lead target.</p></div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+          <label style="font-size:12px;color:var(--ink3)">Month</label>
+          <input type="month" id="sal-month" onchange="renderExecSalary()" style="width:auto"/>
+          <span style="font-size:12px;color:var(--ink3)">· Sundays excluded</span>
+        </div>
+        <div id="sal-banner"></div>
+        <div class="card"><div class="ct">Salary Calculation</div><div id="sal-table"></div></div>
+        <div id="sal-leads"></div>
       </div>
 
       <!-- EXEC: CODES -->
@@ -763,7 +784,7 @@ function resetBackend(){
 // ════════════════════════════════════════
 //  STATE (mirror of sheet data)
 // ════════════════════════════════════════
-let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], reports:[], tasks:[], execCode:'99999' };
+let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], reports:[], tasks:[], leads:[], execCode:'99999' };
 let session = { user:null, role:null };
 let editingId = null;
 let ceCount = 0;
@@ -789,7 +810,26 @@ function normalizeDB(db){
   (db.managers||[]).forEach(m=>{m.createdAt=normDate(m.createdAt);});
   (db.reports||[]).forEach(r=>{r.weekStart=normDate(r.weekStart);r.weekEnd=normDate(r.weekEnd);});
   (db.codes||[]).forEach(c=>{c.generatedDate=normDate(c.generatedDate);});
+  (db.leads||[]).forEach(l=>{l.createdAt=normDate(l.createdAt);});
 }
+
+// ════════════════════════════════════════
+//  LEAD TARGETS & SALARY RULES
+// ════════════════════════════════════════
+const LEAD_TARGETS=[
+  {id:'ig-leads',icon:'📸',label:'Instagram Leads — Krew Marketing',goal:12,staff:['Fathima Salahudheen','Afeefa Firoz'],
+   fields:[{k:'f1',label:'IG Username *',ph:'@company_handle'},{k:'f2',label:'Company / Person Name *',ph:'e.g. Baaqat Flowers'},{k:'f3',label:'Services Enquired For *',ph:'e.g. Social media management'}]},
+  {id:'web-forms',icon:'🌐',label:'Website Form Submissions — Krew Marketing',goal:3,staff:['Vyshak Babu'],
+   fields:[{k:'f1',label:'Client Name *',ph:'Full name'},{k:'f2',label:'Email Address *',ph:'name@email.com'}]}
+];
+const SALARIES={'Fathima Salahudheen':4500,'Muhammed Jasim':4500,'Vyshak Babu':3900,'Peter Noyal':3900,'Afeefa Firoz':3000};
+const ENTRY_CUT_START='2026-08'; // 50 AED per missed entry, from August 2026
+const ENTRY_CUT=50;
+const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead target
+
+function targetsFor(name){return LEAD_TARGETS.filter(t=>t.staff.some(n=>n.toLowerCase()===String(name||'').toLowerCase()));}
+function leadsForTarget(tid,month){return (DB.leads||[]).filter(l=>l.targetId===tid&&(!month||String(l.createdAt).slice(0,7)===month));}
+function leadSuccessCount(tid,month){return leadsForTarget(tid,month).filter(l=>l.success).length;}
 
 async function syncAll(){
   try {
@@ -989,6 +1029,8 @@ function gp(id,el){
     'mgr-late':renderLateList,
     'mgr-review':renderMgrReview,
     'exec-compliance':renderExecCompliance,
+    'exec-salary':renderExecSalary,
+    'my-targets':renderMyTargets,
     'mgr-staff':renderStaffTable,
     'mgr-clients':renderClientList,
     'mgr-codes':renderMgrCodesPage,
@@ -1421,6 +1463,148 @@ function renderProofGalleryList(proofs){
     </div>`).join(''):'<p style="font-size:13px;color:var(--ink3)">No proofs uploaded yet.</p>';
 }
 
+// ════════════════════════════════════════
+//  STAFF: LEAD TARGETS
+// ════════════════════════════════════════
+function renderMyTargets(){
+  const el=document.getElementById('my-targets-wrap');if(!el)return;
+  const mine=targetsFor(session.user.name);
+  if(!mine.length){el.innerHTML=emptyState('🎯','No lead targets assigned to you.');return;}
+  const month=todayStr().slice(0,7);
+  el.innerHTML=mine.map(t=>{
+    const leads=leadsForTarget(t.id,month);
+    const ok=leads.filter(l=>l.success).length;
+    const done=ok>=t.goal;
+    const pct=Math.min(100,Math.round(ok/t.goal*100));
+    return `<div class="card"${done?' style="border-color:rgba(34,197,94,.5)"':''}>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="ct" style="margin-bottom:0">${t.icon} ${t.label}</div>
+        <span class="tag ${done?'t-ok':'t-pu'}" style="font-size:13px">${done?'✅ Target achieved!':ok+' / '+t.goal+' successful'}</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:99px;margin:12px 0;overflow:hidden"><div style="height:100%;width:${pct}%;background:${done?'var(--green)':'var(--accent)'};border-radius:99px;transition:width .3s"></div></div>
+      <div style="font-size:12px;color:var(--ink3);margin-bottom:12px">${t.staff.join(' & ')} · counts successful enquiries in ${month} · missing the goal = ${TARGET_CUT_PCT}% salary reduction</div>
+      <div class="fg">
+        ${t.fields.map(f=>`<div class="f${t.fields.length<3?' full':''}"><label>${f.label}</label><input type="text" id="ld-${t.id}-${f.k}" placeholder="${f.ph}"/></div>`).join('')}
+      </div>
+      <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="addLead('${t.id}')">＋ Add Lead</button>
+      <div style="margin-top:14px">
+        ${leads.length?[...leads].reverse().map(l=>`
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <input type="checkbox" ${l.success?'checked':''} onchange="setLeadSuccess('${l.id}',this.checked)" title="Tick when this becomes a successful enquiry" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;flex-shrink:0"/>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600${l.success?';color:var(--green)':''}">${t.fields.map(f=>escapeHtml(l[f.k]||'')).filter(Boolean).join(' · ')}</div>
+              <div style="font-size:11px;color:var(--ink3);margin-top:2px">${escapeHtml(l.staffName)} · ${l.createdAt}</div>
+            </div>
+            <span class="tag ${l.success?'t-ok':'t-pu'}">${l.success?'✓ Successful enquiry':'○ Pending'}</span>
+            ${String(l.staffId)===String(session.user.id)?`<button class="btn btn-danger btn-xs" onclick="deleteLead('${l.id}')">✕</button>`:''}
+          </div>`).join(''):'<p style="font-size:13px;color:var(--ink3)">No leads logged this month yet — add your first one above.</p>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function addLead(tid){
+  const t=LEAD_TARGETS.find(x=>x.id===tid);if(!t)return;
+  const vals={};
+  for(const f of t.fields){
+    const v=document.getElementById(`ld-${tid}-${f.k}`).value.trim();
+    if(!v){toast(f.label.replace(' *','')+' is required.','err');return;}
+    vals[f.k]=v;
+  }
+  try{
+    await api('addLead',{data:{id:'l'+Date.now(),targetId:tid,staffId:session.user.id,staffName:session.user.name,f1:vals.f1||'',f2:vals.f2||'',f3:vals.f3||'',success:false,createdAt:todayStr()}});
+    await syncAll();renderMyTargets();toast('Lead added.','ok');
+  }catch(e){toast('Failed: '+e.message,'err');}
+}
+async function setLeadSuccess(id,val){
+  try{
+    await api('setLeadSuccess',{id,value:val});
+    await syncAll();
+    if(session.role==='exec')renderExecSalary();else renderMyTargets();
+    toast(val?'Marked as successful enquiry ✅':'Unmarked.','ok');
+  }catch(e){toast('Failed: '+e.message,'err');}
+}
+async function deleteLead(id){
+  if(!confirm('Delete this lead?'))return;
+  try{await api('deleteLead',{id});await syncAll();renderMyTargets();toast('Lead deleted.');}
+  catch(e){toast('Failed: '+e.message,'err');}
+}
+
+// ════════════════════════════════════════
+//  EXEC: SALARY & COMPLIANCE
+// ════════════════════════════════════════
+function renderExecSalary(){
+  const mEl=document.getElementById('sal-month');if(!mEl)return;
+  if(!mEl.value)mEl.value=todayStr().slice(0,7);
+  const month=mEl.value;
+  const monthStart=month+'-01';
+  const end=new Date(Date.parse(monthStart+'T00:00:00Z'));
+  end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);
+  const monthEnd=end.toISOString().slice(0,10);
+  const yesterday=localDateStr(new Date(Date.now()-86400000));
+  const monthOver=todayStr()>monthEnd;
+  const countEnd=monthOver?monthEnd:(yesterday<monthEnd?yesterday:monthEnd);
+  const cutsActive=month>=ENTRY_CUT_START;
+  const days=[];let cur=monthStart;
+  while(cur<=countEnd&&days.length<32){
+    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
+    cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  }
+  const banner=document.getElementById('sal-banner');
+  let notes=[];
+  if(!cutsActive)notes.push('Entry deductions (50 AED each) apply from August 2026 — this month shows missed counts only, with no entry cut.');
+  if(!monthOver)notes.push(`Month still in progress — the ${TARGET_CUT_PCT}% target cut only applies if the goal is still unmet at month end.`);
+  banner.innerHTML=notes.length?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>ℹ️</span><span>${notes.join(' ')}</span></div>`:'';
+  const rows=DB.staff.map(s=>{
+    const base=SALARIES[s.name]!==undefined?SALARIES[s.name]:null;
+    let missedSlots=0;
+    days.forEach(date=>{
+      if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
+      const n=DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length;
+      missedSlots+=Math.max(0,2-n);
+    });
+    const entryCut=cutsActive&&base!=null?missedSlots*ENTRY_CUT:0;
+    const myT=targetsFor(s.name);
+    let targetCut=0;
+    const targetHtml=myT.length?myT.map(t=>{
+      const ok=leadSuccessCount(t.id,month);
+      const done=ok>=t.goal;
+      if(!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
+      return `<span class="tag ${done?'t-ok':(monthOver?'t-late':'t-pu')}">${t.icon} ${ok}/${t.goal}${done?' ✓':(monthOver?' ✗':'')}</span>`;
+    }).join(' '):'<span style="color:var(--ink3)">—</span>';
+    const finalPay=base!=null?base-entryCut-targetCut:null;
+    return {s,base,missedSlots,entryCut,targetHtml,targetCut,finalPay};
+  });
+  const totBase=rows.reduce((a,r)=>a+(r.base||0),0);
+  const totFinal=rows.reduce((a,r)=>a+(r.finalPay||0),0);
+  document.getElementById('sal-table').innerHTML=`
+    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Final (AED)</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td style="font-family:var(--font);font-weight:800">${escapeHtml(r.s.name)}</td>
+      <td>${r.base!=null?r.base.toLocaleString():'<span style="color:var(--ink3)">not set</span>'}</td>
+      <td><span class="tag ${r.missedSlots?'t-late':'t-ok'}">${r.missedSlots}</span></td>
+      <td style="color:${r.entryCut?'var(--red)':'var(--ink3)'}">${r.entryCut?'−'+r.entryCut.toLocaleString():'0'}</td>
+      <td>${r.targetHtml}</td>
+      <td style="color:${r.targetCut?'var(--red)':'var(--ink3)'}">${r.targetCut?'−'+r.targetCut.toLocaleString():'0'}</td>
+      <td style="font-family:var(--font);font-weight:800;color:${r.finalPay!=null&&r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay!=null?r.finalPay.toLocaleString():'—'}</td>
+    </tr>`).join('')}
+    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
+    </tbody></table>
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Missed entries counted over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Each missing entry slot (2 per day) counts once.</p>`;
+  document.getElementById('sal-leads').innerHTML=LEAD_TARGETS.map(t=>{
+    const leads=leadsForTarget(t.id,month);
+    const ok=leads.filter(l=>l.success).length;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="ct" style="margin-bottom:0">${t.icon} ${t.label} — ${t.staff.join(' & ')}</div>
+        <span class="tag ${ok>=t.goal?'t-ok':'t-pu'}">${ok} / ${t.goal} successful</span>
+      </div>
+      ${leads.length?`<table class="stbl" style="margin-top:10px"><thead><tr>${t.fields.map(f=>`<th>${f.label.replace(' *','')}</th>`).join('')}<th>By</th><th>Date</th><th>Status</th></tr></thead><tbody>
+        ${[...leads].reverse().map(l=>`<tr>${t.fields.map(f=>`<td>${escapeHtml(l[f.k]||'')}</td>`).join('')}<td>${escapeHtml(l.staffName)}</td><td style="color:var(--ink3)">${l.createdAt}</td><td><span class="tag ${l.success?'t-ok':'t-pu'}">${l.success?'✓ Successful':'○ Pending'}</span></td></tr>`).join('')}
+      </tbody></table>`:'<p style="font-size:13px;color:var(--ink3);margin-top:10px">No leads logged this month.</p>'}
+    </div>`;
+  }).join('');
+}
+
 function renderStaffTable(){
   const tbody=document.getElementById('staff-tbody');
   if(!DB.staff.length){tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--ink3)">No staff accounts yet.</td></tr>`;return;}
@@ -1731,6 +1915,11 @@ function updateBadges(){
   const myTasks=myId&&session.role==='staff'?tasks.filter(t=>String(t.assignedTo)===String(myId)&&!t.done).length:0;
   const myAssigned=myId?tasks.filter(t=>String(t.createdById)===String(myId)&&!t.done).length:0;
   const bMT=document.getElementById('b-mytasks');if(bMT)bMT.textContent=myTasks;
+  const bTg=document.getElementById('b-mytargets');
+  if(bTg&&session.user&&session.role==='staff'){
+    const m=todayStr().slice(0,7);
+    bTg.textContent=targetsFor(session.user.name).filter(t=>leadSuccessCount(t.id,m)<t.goal).length;
+  }
   const bgMT=document.getElementById('b-mgr-tasks');if(bgMT)bgMT.textContent=myAssigned;
   const beMT=document.getElementById('b-exec-tasks');if(beMT)beMT.textContent=myAssigned;
   // Report status badge for manager
