@@ -16,7 +16,7 @@ const SHEETS = {
   codes:    ['id', 'code', 'staffId', 'staffName', 'note', 'issuedByRole', 'issuedById', 'issuedByName', 'generatedAt', 'generatedDate', 'generatedTime', 'used', 'usedBy', 'usedByName', 'usedAt'],
   reports:  ['id', 'weekStart', 'weekEnd', 'submittedAt', 'submittedBy', 'submittedById', 'breakdown', 'note', 'totalHours'],
   tasks:    ['id', 'title', 'description', 'assignedTo', 'assignedToName', 'createdByRole', 'createdById', 'createdByName', 'deadline', 'done', 'doneAt', 'staffNote', 'imageUrl', 'createdAt'],
-  leads:    ['id', 'targetId', 'staffId', 'staffName', 'f1', 'f2', 'f3', 'success', 'createdAt'],
+  leads:    ['id', 'targetId', 'staffId', 'staffName', 'f1', 'f2', 'f3', 'success', 'createdAt', 'salesStatus', 'salesReason', 'salesFee', 'salesBy', 'salesAt'],
   config:   ['key', 'value']
 };
 
@@ -59,6 +59,7 @@ function handleRequest(e) {
       case 'completeTask': result = completeTask(ss, params); break;
       case 'addLead':      result = addRow(ss, 'leads', JSON.parse(params.data)); break;
       case 'setLeadSuccess': result = updateField(ss, 'leads', params.id, 'success', params.value === 'true'); break;
+      case 'setLeadSales': result = setLeadSales(ss, params); break;
       case 'deleteLead':   result = deleteRow(ss, 'leads', params.id); break;
       case 'setExecCode':  result = setConfig(ss, 'execCode', params.value); break;
       default: result = { error: 'Unknown action' };
@@ -307,6 +308,26 @@ function completeTask(ss, params) {
         const url = saveImageToDrive(params.imageData, params.imageType, 'task_' + params.id + '.jpg');
         sh.getRange(i + 1, col('imageUrl') + 1).setValue(url);
       }
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Not found' };
+}
+
+// Manager sets the sales outcome for a logged enquiry.
+function setLeadSales(ss, params) {
+  const sh = ss.getSheetByName('leads');
+  const headers = sheetHeaders(sh, 'leads');
+  const data = sh.getDataRange().getValues();
+  const col = h => headers.indexOf(h);
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(params.id)) {
+      const set = (h, v) => { if (col(h) >= 0) sh.getRange(i + 1, col(h) + 1).setValue(v); };
+      set('salesStatus', params.status || '');
+      set('salesReason', params.reason || '');
+      set('salesFee', params.fee || '');
+      set('salesBy', params.by || '');
+      set('salesAt', params.at || '');
       return { ok: true };
     }
   }

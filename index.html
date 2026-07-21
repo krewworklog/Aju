@@ -333,6 +333,8 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav active" onclick="gp('mgr-dash',this)"><span class="nav-ic">📊</span>Overview</div>
         <div class="nav" onclick="gp('mgr-entries',this)"><span class="nav-ic">📄</span>All Entries<span class="nbadge" id="b-mgr">0</span></div>
         <div class="nav" onclick="gp('mgr-late',this)"><span class="nav-ic">⏳</span>Late Submissions<span class="nbadge amber" id="b-pend">0</span></div>
+        <div class="sbl">Sales</div>
+        <div class="nav" onclick="gp('mgr-sales',this)"><span class="nav-ic">💼</span>Sales<span class="nbadge amber" id="b-sales">0</span></div>
         <div class="sbl">Weekly Report</div>
         <div class="nav" onclick="gp('mgr-report',this)"><span class="nav-ic">📊</span>Weekly Report<span class="nbadge" id="b-report">●</span></div>
         <div class="sbl">Tasks</div>
@@ -441,6 +443,13 @@ textarea{resize:vertical;line-height:1.6;}
       <div class="page" id="page-mgr-late">
         <div class="ph"><div><div class="pt">Late Submissions</div><p class="ps">Entries submitted after deadline using approval codes.</p></div></div>
         <div id="late-list"></div>
+      </div>
+
+      <!-- MANAGER: SALES -->
+      <div class="page" id="page-mgr-sales">
+        <div class="ph"><div><div class="pt">Sales Pipeline</div><p class="ps">Every enquiry logged by staff appears here. Mark each one — Contacted, Approved, Denied, or No response. Approved needs the agreed monthly fee; Denied needs a reason.</p></div></div>
+        <div class="sg" id="mgr-sales-stats"></div>
+        <div id="mgr-sales-list"></div>
       </div>
 
       <!-- MANAGER: REVIEW ENTRIES -->
@@ -827,6 +836,8 @@ const ENTRY_CUT_START='2026-08'; // 50 AED per missed entry, from August 2026
 const ENTRY_CUT=50;
 const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead target
 
+const SALES_STATUSES=['Contacted','Approved','Denied','No response'];
+function leadTargetDef(l){return LEAD_TARGETS.find(t=>t.id===String(l.targetId))||LEAD_TARGETS[0];}
 function targetsFor(name){return LEAD_TARGETS.filter(t=>t.staff.some(n=>n.toLowerCase()===String(name||'').toLowerCase()));}
 function leadsForTarget(tid,month){return (DB.leads||[]).filter(l=>l.targetId===tid&&(!month||String(l.createdAt).slice(0,7)===month));}
 
@@ -1027,6 +1038,7 @@ function gp(id,el){
     'mgr-entries':()=>{fillClientFilter('mf-client');renderMgrEntries();},
     'mgr-late':renderLateList,
     'mgr-review':renderMgrReview,
+    'mgr-sales':renderMgrSales,
     'exec-compliance':renderExecCompliance,
     'exec-salary':renderExecSalary,
     'my-targets':renderMyTargets,
@@ -1519,6 +1531,72 @@ async function deleteLead(id){
 }
 
 // ════════════════════════════════════════
+//  MANAGER: SALES PIPELINE
+// ════════════════════════════════════════
+let salesDraft={};
+function salesStatusTag(l){
+  const s=l.salesStatus;
+  if(!s)return '<span class="tag t-pu">○ New</span>';
+  const cls=s==='Approved'?'t-ok':(s==='Denied'?'t-late':'t-pu');
+  return `<span class="tag ${cls}">${s==='Approved'?'✓ ':''}${escapeHtml(s)}</span>`;
+}
+function renderMgrSales(){
+  const el=document.getElementById('mgr-sales-list');if(!el)return;
+  const leads=[...(DB.leads||[])].reverse();
+  const cnt=s=>(DB.leads||[]).filter(l=>l.salesStatus===s).length;
+  const newCnt=(DB.leads||[]).filter(l=>!l.salesStatus).length;
+  const totalFee=(DB.leads||[]).filter(l=>l.salesStatus==='Approved').reduce((a,l)=>a+(parseFloat(l.salesFee)||0),0);
+  const stat=document.getElementById('mgr-sales-stats');
+  if(stat)stat.innerHTML=`
+    <div class="sc"><div class="sl">New</div><div class="sv sv-am">${newCnt}</div><div class="ss">to review</div></div>
+    <div class="sc"><div class="sl">Approved</div><div class="sv sv-gr">${cnt('Approved')}</div><div class="ss">clients</div></div>
+    <div class="sc"><div class="sl">Denied</div><div class="sv" style="color:var(--red)">${cnt('Denied')}</div><div class="ss">leads</div></div>
+    <div class="sc"><div class="sl">Agreed Fee</div><div class="sv sv-ac">${totalFee.toLocaleString()}</div><div class="ss">AED / month</div></div>`;
+  el.innerHTML=leads.length?leads.map(l=>salesCard(l)).join(''):emptyState('💼','No sales leads yet. Enquiries logged by staff appear here automatically.');
+}
+function salesCard(l){
+  const t=leadTargetDef(l);
+  const cur=salesDraft[l.id]!==undefined?salesDraft[l.id]:(l.salesStatus||'');
+  const info=t.fields.map(f=>`<div style="font-size:12px"><span style="color:var(--ink3)">${f.label.replace(' *','')}:</span> ${escapeHtml(l[f.k]||'—')}</div>`).join('');
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+      <div><div class="ct" style="margin-bottom:4px">${t.icon} ${escapeHtml(l.f2||l.f1||'Lead')}</div>
+        <div style="font-size:11px;color:var(--ink3)">${escapeHtml(l.staffName)} · ${l.createdAt} · ${t.label}</div></div>
+      ${salesStatusTag(l)}
+    </div>
+    <div style="margin:10px 0;display:grid;gap:4px">${info}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      ${SALES_STATUSES.map(s=>`<button class="btn ${cur===s?'btn-primary':'btn-ghost'} btn-xs" onclick="selectSales('${l.id}','${s}')">${s}</button>`).join('')}
+    </div>
+    ${cur==='Approved'?`<div class="f full"><label>Monthly marketing fee agreed (AED) *</label><input type="number" min="0" step="50" id="sales-fee-${l.id}" value="${l.salesFee||''}" placeholder="e.g. 1500"/></div>`:''}
+    ${cur==='Denied'?`<div class="f full"><label>Reason for denial *</label><textarea id="sales-reason-${l.id}" style="min-height:52px" placeholder="Why was it denied?">${escapeHtml(l.salesReason||'')}</textarea></div>`:''}
+    ${l.salesStatus?`<div style="font-size:11px;color:var(--ink3);margin-top:6px">Last set by ${escapeHtml(l.salesBy||'—')}${l.salesAt?' · '+l.salesAt:''}${l.salesStatus==='Approved'&&l.salesFee?' · '+parseFloat(l.salesFee).toLocaleString()+' AED/mo':''}${l.salesStatus==='Denied'&&l.salesReason?' · '+escapeHtml(l.salesReason):''}</div>`:''}
+    ${cur?`<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveLeadSales('${l.id}')">💾 Save status</button>`:''}
+  </div>`;
+}
+function selectSales(id,status){salesDraft[id]=status;renderMgrSales();}
+async function saveLeadSales(id){
+  const l=(DB.leads||[]).find(x=>String(x.id)===String(id));if(!l)return;
+  const status=salesDraft[id]!==undefined?salesDraft[id]:(l.salesStatus||'');
+  if(!status){toast('Pick a status.','err');return;}
+  let reason='',fee='';
+  if(status==='Approved'){
+    fee=(document.getElementById('sales-fee-'+id)||{}).value||'';
+    if(!fee||parseFloat(fee)<=0){toast('Enter the agreed monthly fee.','err');return;}
+  }
+  if(status==='Denied'){
+    reason=((document.getElementById('sales-reason-'+id)||{}).value||'').trim();
+    if(!reason){toast('Enter a reason for denial.','err');return;}
+  }
+  try{
+    await api('setLeadSales',{id,status,reason,fee,by:session.user.name,at:todayStr()+' '+nowTime()});
+    delete salesDraft[id];
+    await syncAll();renderMgrSales();
+    toast('Sales status saved.','ok');
+  }catch(e){toast('Failed: '+e.message,'err');}
+}
+
+// ════════════════════════════════════════
 //  EXEC: SALARY & COMPLIANCE
 // ════════════════════════════════════════
 function renderExecSalary(){
@@ -1587,8 +1665,8 @@ function renderExecSalary(){
         <div class="ct" style="margin-bottom:0">${t.icon} ${t.label} — ${t.staff.join(' & ')}</div>
         <span class="tag ${ok>=t.goal?'t-ok':'t-pu'}">${ok} / ${t.goal} enquiries</span>
       </div>
-      ${leads.length?`<table class="stbl" style="margin-top:10px"><thead><tr><th>#</th>${t.fields.map(f=>`<th>${f.label.replace(' *','')}</th>`).join('')}<th>By</th><th>Date</th></tr></thead><tbody>
-        ${leads.map((l,i)=>`<tr><td style="color:var(--ink3)">${i+1}</td>${t.fields.map(f=>`<td>${escapeHtml(l[f.k]||'')}</td>`).join('')}<td>${escapeHtml(l.staffName)}</td><td style="color:var(--ink3)">${l.createdAt}</td></tr>`).join('')}
+      ${leads.length?`<table class="stbl" style="margin-top:10px"><thead><tr><th>#</th>${t.fields.map(f=>`<th>${f.label.replace(' *','')}</th>`).join('')}<th>By</th><th>Date</th><th>Sales</th></tr></thead><tbody>
+        ${leads.map((l,i)=>`<tr><td style="color:var(--ink3)">${i+1}</td>${t.fields.map(f=>`<td>${escapeHtml(l[f.k]||'')}</td>`).join('')}<td>${escapeHtml(l.staffName)}</td><td style="color:var(--ink3)">${l.createdAt}</td><td>${salesStatusTag(l)}${l.salesStatus==='Approved'&&l.salesFee?` <span style="color:var(--ink3);font-size:11px">${parseFloat(l.salesFee).toLocaleString()} AED/mo</span>`:''}</td></tr>`).join('')}
       </tbody></table>`:'<p style="font-size:13px;color:var(--ink3);margin-top:10px">No enquiries logged this month.</p>'}
     </div>`;
   }).join('');
@@ -1895,6 +1973,7 @@ function updateBadges(){
   const bM=document.getElementById('b-mgr');if(bM)bM.textContent=total;
   const bP=document.getElementById('b-pend');if(bP)bP.textContent=lateCount;
   const bRv=document.getElementById('b-review');if(bRv)bRv.textContent=unreviewedEntries().filter(e=>!reviewDeadlinePassed(e)).length;
+  const bSl=document.getElementById('b-sales');if(bSl)bSl.textContent=(DB.leads||[]).filter(l=>!l.salesStatus).length;
   const bComp=document.getElementById('b-exec-comp');if(bComp)bComp.textContent=missedReviewEntries().length;
   const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
   const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
