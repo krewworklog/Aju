@@ -409,7 +409,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- STAFF: LEAD TARGETS -->
       <div class="page" id="page-my-targets">
-        <div class="ph"><div><div class="pt">My Lead Targets</div><p class="ps">Log every lead you contact, and tick the box when they make an enquiry.</p></div></div>
+        <div class="ph"><div><div class="pt">My Lead Targets</div><p class="ps">Log each organic enquiry you receive. Every one you add counts toward your monthly goal.</p></div></div>
         <div id="my-targets-wrap"></div>
       </div>
 
@@ -829,7 +829,6 @@ const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead targe
 
 function targetsFor(name){return LEAD_TARGETS.filter(t=>t.staff.some(n=>n.toLowerCase()===String(name||'').toLowerCase()));}
 function leadsForTarget(tid,month){return (DB.leads||[]).filter(l=>l.targetId===tid&&(!month||String(l.createdAt).slice(0,7)===month));}
-function leadSuccessCount(tid,month){return leadsForTarget(tid,month).filter(l=>l.success).length;}
 
 async function syncAll(){
   try {
@@ -1473,7 +1472,7 @@ function renderMyTargets(){
   const month=todayStr().slice(0,7);
   el.innerHTML=mine.map(t=>{
     const leads=leadsForTarget(t.id,month);
-    const ok=leads.filter(l=>l.success).length;
+    const ok=leads.length;
     const done=ok>=t.goal;
     const pct=Math.min(100,Math.round(ok/t.goal*100));
     return `<div class="card"${done?' style="border-color:rgba(34,197,94,.5)"':''}>
@@ -1485,18 +1484,17 @@ function renderMyTargets(){
       <div class="fg">
         ${t.fields.map(f=>`<div class="f${t.fields.length<3?' full':''}"><label>${f.label}</label><input type="text" id="ld-${t.id}-${f.k}" placeholder="${f.ph}"/></div>`).join('')}
       </div>
-      <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="addLead('${t.id}')">＋ Add Lead</button>
+      <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="addLead('${t.id}')">＋ Add Enquiry</button>
       <div style="margin-top:14px">
-        ${leads.length?[...leads].reverse().map(l=>`
+        ${leads.length?[...leads].reverse().map((l,idx)=>`
           <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-            <input type="checkbox" ${l.success?'checked':''} onchange="setLeadSuccess('${l.id}',this.checked)" title="Tick when this lead makes an enquiry" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;flex-shrink:0"/>
+            <span class="tag t-ok" style="flex-shrink:0">#${leads.length-idx}</span>
             <div style="flex:1">
-              <div style="font-size:13px;font-weight:600${l.success?';color:var(--green)':''}">${t.fields.map(f=>escapeHtml(l[f.k]||'')).filter(Boolean).join(' · ')}</div>
+              <div style="font-size:13px;font-weight:600">${t.fields.map(f=>escapeHtml(l[f.k]||'')).filter(Boolean).join(' · ')}</div>
               <div style="font-size:11px;color:var(--ink3);margin-top:2px">${escapeHtml(l.staffName)} · ${l.createdAt}</div>
             </div>
-            <span class="tag ${l.success?'t-ok':'t-pu'}">${l.success?'✓ Enquiry':'○ Contacted'}</span>
             ${String(l.staffId)===String(session.user.id)?`<button class="btn btn-danger btn-xs" onclick="deleteLead('${l.id}')">✕</button>`:''}
-          </div>`).join(''):'<p style="font-size:13px;color:var(--ink3)">No leads logged this month yet — add your first one above.</p>'}
+          </div>`).join(''):'<p style="font-size:13px;color:var(--ink3)">No enquiries logged this month yet — add your first one above.</p>'}
       </div>
     </div>`;
   }).join('');
@@ -1510,21 +1508,13 @@ async function addLead(tid){
     vals[f.k]=v;
   }
   try{
-    await api('addLead',{data:{id:'l'+Date.now(),targetId:tid,staffId:session.user.id,staffName:session.user.name,f1:vals.f1||'',f2:vals.f2||'',f3:vals.f3||'',success:false,createdAt:todayStr()}});
-    await syncAll();renderMyTargets();toast('Lead added.','ok');
-  }catch(e){toast('Failed: '+e.message,'err');}
-}
-async function setLeadSuccess(id,val){
-  try{
-    await api('setLeadSuccess',{id,value:val});
-    await syncAll();
-    if(session.role==='exec')renderExecSalary();else renderMyTargets();
-    toast(val?'Enquiry marked ✅':'Unmarked.','ok');
+    await api('addLead',{data:{id:'l'+Date.now(),targetId:tid,staffId:session.user.id,staffName:session.user.name,f1:vals.f1||'',f2:vals.f2||'',f3:vals.f3||'',success:true,createdAt:todayStr()}});
+    await syncAll();renderMyTargets();toast('Enquiry added ✅','ok');
   }catch(e){toast('Failed: '+e.message,'err');}
 }
 async function deleteLead(id){
-  if(!confirm('Delete this lead?'))return;
-  try{await api('deleteLead',{id});await syncAll();renderMyTargets();toast('Lead deleted.');}
+  if(!confirm('Delete this enquiry?'))return;
+  try{await api('deleteLead',{id});await syncAll();renderMyTargets();toast('Enquiry deleted.');}
   catch(e){toast('Failed: '+e.message,'err');}
 }
 
@@ -1565,7 +1555,7 @@ function renderExecSalary(){
     const myT=targetsFor(s.name);
     let targetCut=0;
     const targetHtml=myT.length?myT.map(t=>{
-      const ok=leadSuccessCount(t.id,month);
+      const ok=leadsForTarget(t.id,month).length;
       const done=ok>=t.goal;
       if(!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
       return `<span class="tag ${done?'t-ok':(monthOver?'t-late':'t-pu')}">${t.icon} ${ok}/${t.goal}${done?' ✓':(monthOver?' ✗':'')}</span>`;
@@ -1591,15 +1581,15 @@ function renderExecSalary(){
     <p style="font-size:11px;color:var(--ink3);margin-top:10px">Missed entries counted over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Each missing entry slot (2 per day) counts once.</p>`;
   document.getElementById('sal-leads').innerHTML=LEAD_TARGETS.map(t=>{
     const leads=leadsForTarget(t.id,month);
-    const ok=leads.filter(l=>l.success).length;
+    const ok=leads.length;
     return `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <div class="ct" style="margin-bottom:0">${t.icon} ${t.label} — ${t.staff.join(' & ')}</div>
         <span class="tag ${ok>=t.goal?'t-ok':'t-pu'}">${ok} / ${t.goal} enquiries</span>
       </div>
-      ${leads.length?`<table class="stbl" style="margin-top:10px"><thead><tr>${t.fields.map(f=>`<th>${f.label.replace(' *','')}</th>`).join('')}<th>By</th><th>Date</th><th>Status</th></tr></thead><tbody>
-        ${[...leads].reverse().map(l=>`<tr>${t.fields.map(f=>`<td>${escapeHtml(l[f.k]||'')}</td>`).join('')}<td>${escapeHtml(l.staffName)}</td><td style="color:var(--ink3)">${l.createdAt}</td><td><span class="tag ${l.success?'t-ok':'t-pu'}">${l.success?'✓ Enquiry':'○ Contacted'}</span></td></tr>`).join('')}
-      </tbody></table>`:'<p style="font-size:13px;color:var(--ink3);margin-top:10px">No leads logged this month.</p>'}
+      ${leads.length?`<table class="stbl" style="margin-top:10px"><thead><tr><th>#</th>${t.fields.map(f=>`<th>${f.label.replace(' *','')}</th>`).join('')}<th>By</th><th>Date</th></tr></thead><tbody>
+        ${leads.map((l,i)=>`<tr><td style="color:var(--ink3)">${i+1}</td>${t.fields.map(f=>`<td>${escapeHtml(l[f.k]||'')}</td>`).join('')}<td>${escapeHtml(l.staffName)}</td><td style="color:var(--ink3)">${l.createdAt}</td></tr>`).join('')}
+      </tbody></table>`:'<p style="font-size:13px;color:var(--ink3);margin-top:10px">No enquiries logged this month.</p>'}
     </div>`;
   }).join('');
 }
@@ -1917,7 +1907,7 @@ function updateBadges(){
   const bTg=document.getElementById('b-mytargets');
   if(bTg&&session.user&&session.role==='staff'){
     const m=todayStr().slice(0,7);
-    bTg.textContent=targetsFor(session.user.name).filter(t=>leadSuccessCount(t.id,m)<t.goal).length;
+    bTg.textContent=targetsFor(session.user.name).filter(t=>leadsForTarget(t.id,m).length<t.goal).length;
   }
   const bgMT=document.getElementById('b-mgr-tasks');if(bgMT)bgMT.textContent=myAssigned;
   const beMT=document.getElementById('b-exec-tasks');if(beMT)beMT.textContent=myAssigned;
