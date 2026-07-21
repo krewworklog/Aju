@@ -335,12 +335,9 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('mgr-late',this)"><span class="nav-ic">⏳</span>Late Submissions<span class="nbadge amber" id="b-pend">0</span></div>
         <div class="sbl">Sales</div>
         <div class="nav" onclick="gp('mgr-sales',this)"><span class="nav-ic">💼</span>Sales<span class="nbadge amber" id="b-sales">0</span></div>
-        <div class="sbl">Weekly Report</div>
-        <div class="nav" onclick="gp('mgr-report',this)"><span class="nav-ic">📊</span>Weekly Report<span class="nbadge" id="b-report">●</span></div>
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('mgr-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-mgr-tasks">0</span></div>
         <div class="sbl">Approvals</div>
-        <div class="nav" onclick="gp('mgr-review',this)"><span class="nav-ic">☑️</span>Review Entries<span class="nbadge amber" id="b-review">0</span></div>
         <div class="nav" onclick="gp('mgr-codes',this)"><span class="nav-ic">🎟</span>Approval Codes<span class="nbadge purple" id="b-mgr-codes">0</span></div>
         <div class="sbl">Settings</div>
         <div class="nav" onclick="gp('mgr-staff',this)"><span class="nav-ic">👥</span>Staff Accounts</div>
@@ -352,7 +349,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-entries',this)"><span class="nav-ic">📋</span>All Logs</div>
         <div class="nav" onclick="gp('exec-clients',this)"><span class="nav-ic">📈</span>By Client</div>
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
-        <div class="nav" onclick="gp('exec-compliance',this)"><span class="nav-ic">🚨</span>Compliance<span class="nbadge red" id="b-exec-comp">0</span></div>
+        <div class="nav" onclick="gp('exec-compliance',this)"><span class="nav-ic">🚨</span>Compliance</div>
         <div class="nav" onclick="gp('exec-salary',this)"><span class="nav-ic">💰</span>Salary</div>
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('exec-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-exec-tasks">0</span></div>
@@ -418,7 +415,6 @@ textarea{resize:vertical;line-height:1.6;}
       <!-- MANAGER: OVERVIEW -->
       <div class="page" id="page-mgr-dash">
         <div class="ph"><div><div class="pt">Manager Dashboard</div><p class="ps">Team performance at a glance.</p></div><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
-        <div id="mgr-report-alert"></div>
         <div class="sg" id="mgr-stats"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
           <div class="card"><div class="ct">Hours by Staff</div><div class="bc" id="bc-staff"></div></div>
@@ -452,13 +448,6 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="mgr-sales-list"></div>
       </div>
 
-      <!-- MANAGER: REVIEW ENTRIES -->
-      <div class="page" id="page-mgr-review">
-        <div class="ph"><div><div class="pt">Review Entries</div><p class="ps">Approve or reject each staff entry and its proof screenshot. Reviews lock the next working day at 1:00 PM (Dubai; Sundays off, so Saturday entries lock Monday) — missed reviews are reported to the executive.</p></div></div>
-        <div class="sg" id="mgr-review-stats"></div>
-        <div id="mgr-review-list"></div>
-      </div>
-
       <!-- MANAGER: CODES -->
       <div class="page" id="page-mgr-codes">
         <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 3:00 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
@@ -481,33 +470,6 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="card"><div class="ct">Client List</div>
           <ul class="cmgr-list" id="client-list"></ul>
           <div class="add-row"><input type="text" id="new-client" placeholder="New client name..." onkeydown="if(event.key==='Enter')addClient()"/><button class="btn btn-ghost" onclick="addClient()">＋ Add</button></div>
-        </div>
-      </div>
-
-      <!-- MANAGER: WEEKLY REPORT -->
-      <div class="page" id="page-mgr-report">
-        <div class="ph"><div><div class="pt">Weekly Report</div><p class="ps">Submit every Monday by 2:00 PM. Covers the previous week (Mon–Sun).</p></div></div>
-        <div id="report-status-banner"></div>
-        <div class="card">
-          <div class="ct">Report Week</div>
-          <div id="report-week-info" style="font-size:14px;color:var(--ink2);line-height:1.7"></div>
-        </div>
-        <div class="card">
-          <div class="ct">Hours Breakdown — auto-aggregated from staff entries</div>
-          <div id="report-breakdown"></div>
-        </div>
-        <div class="card">
-          <div class="ct">Manager's Note *</div>
-          <div class="f">
-            <textarea id="report-note" placeholder="Comments, observations, or context for this week. e.g. Strong week for client deliverables. Two staff on leave Wed-Thu. Plans for next week..." style="min-height:120px"></textarea>
-          </div>
-        </div>
-        <div style="display:flex;gap:10px;margin-top:1rem">
-          <button class="btn btn-primary" style="flex:1;padding:12px;font-size:14px;border-radius:var(--rl)" onclick="submitReport()" id="report-submit-btn">✔ Submit Weekly Report</button>
-        </div>
-        <div class="card" style="margin-top:2rem">
-          <div class="ct">Previously Submitted Reports</div>
-          <div id="reports-history"></div>
         </div>
       </div>
 
@@ -545,10 +507,8 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- EXEC: COMPLIANCE -->
       <div class="page" id="page-exec-compliance">
-        <div class="ph"><div><div class="pt">Compliance</div><p class="ps">Missed manager reviews (due next day 1:00 PM), staff who missed entries, and all proof screenshots.</p></div></div>
-        <div id="comp-salary-alert"></div>
+        <div class="ph"><div><div class="pt">Compliance</div><p class="ps">Staff who missed entries and all proof screenshots.</p></div></div>
         <div class="sg" id="comp-stats"></div>
-        <div class="card"><div class="ct">Missed Reviews — entries the manager never approved in time</div><div id="comp-missed-reviews"></div></div>
         <div class="card"><div class="ct">Staff Missed Entries</div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <label style="font-size:12px;color:var(--ink3)">From</label><input type="date" id="cme-from" onchange="renderCompMissed()" style="width:auto"/>
@@ -899,37 +859,7 @@ function isLate(){return isLateForEntry(currentEntry);}
 function canManagerIssueCodes(){const m=dubaiMinutes();return m>=ENTRIES[0].deadlineMins && m<21*60;}
 function timeWindow(){const m=dubaiMinutes();if(m<ENTRIES[0].deadlineMins)return 'open';if(m<21*60)return 'manager';return 'exec';}
 
-// ════════════════════════════════════════
-//  ENTRY REVIEWS (manager approves each entry + proof by next day 1:00 PM)
-// ════════════════════════════════════════
-const REVIEW_START='2026-07-18'; // entries before this date are exempt (no review needed)
-function entryReview(e){return (e.rows&&e.rows[0]&&e.rows[0]._review)||null;}
-function needsReview(e){return String(e.date)>=REVIEW_START;}
-// Review window closes the next working day at 1:00 PM Dubai.
-// Sunday is the day off, so Saturday entries are due for review Monday 1:00 PM.
-function reviewDeadlineDate(e){
-  let d=new Date(new Date(e.date+'T13:00:00+04:00').getTime()+24*3600*1000);
-  if(new Date(d.getTime()+4*3600*1000).getUTCDay()===0)d=new Date(d.getTime()+24*3600*1000);
-  return d;
-}
-function reviewDeadlinePassed(e){return Date.now()>reviewDeadlineDate(e).getTime();}
-function reviewState(e){
-  if(!needsReview(e))return 'legacy';
-  const r=entryReview(e);
-  if(r)return r.status==='rejected'?'rejected':'approved';
-  return reviewDeadlinePassed(e)?'missed':'pending';
-}
-function fmtReviewDeadline(e){
-  return reviewDeadlineDate(e).toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-}
-function reviewTag(e){
-  const s=reviewState(e);const r=entryReview(e);
-  if(s==='legacy')return '';
-  if(s==='approved')return `<span class="tag t-ok" title="${escapeHtml(r&&r.by?'By '+r.by+(r.at?' · '+r.at:''):'')}">☑ Reviewed</span>`;
-  if(s==='rejected')return `<span class="tag t-late" title="${escapeHtml(r?(r.by?'By '+r.by+' · ':'')+(r.note||''):'')}">✕ Rejected</span>`;
-  if(s==='missed')return `<span class="tag t-late">🔒 Review missed</span>`;
-  return `<span class="tag t-pu">⏳ Awaiting review</span>`;
-}
+// Proof screenshots are uploaded by staff and viewable by the executive.
 function proofFileId(url){const m=String(url).match(/[?&]id=([\w-]+)/);return m?m[1]:'';}
 function proofThumbHtml(url){
   const id=proofFileId(url);
@@ -1045,7 +975,6 @@ function gp(id,el){
     'mgr-dash':renderMgrDash,
     'mgr-entries':()=>{fillClientFilter('mf-client');renderMgrEntries();},
     'mgr-late':renderLateList,
-    'mgr-review':renderMgrReview,
     'mgr-sales':renderMgrSales,
     'exec-compliance':renderExecCompliance,
     'exec-salary':renderExecSalary,
@@ -1053,7 +982,6 @@ function gp(id,el){
     'mgr-staff':renderStaffTable,
     'mgr-clients':renderClientList,
     'mgr-codes':renderMgrCodesPage,
-    'mgr-report':renderMgrReport,
     'my-logs':renderMyLogs,
     'my-tasks':renderMyTasks,
     'mgr-tasks':renderAssignerTasks,
@@ -1268,7 +1196,6 @@ function entryCard(e,isOwner){
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${entryLabel?`<span class="tag t-pu">${entryLabel}</span>`:''}
         <span class="tag ${e.late?'t-late':'t-ok'}">${e.late?'⚠ Late (approved)':'✓ On time'}</span>
-        ${reviewTag(e)}
         ${e.editedAt?`<span class="tag t-pu" style="font-size:10px">✏ Edited</span>`:''}
       </div>
     </div>
@@ -1276,10 +1203,6 @@ function entryCard(e,isOwner){
     <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span></div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div>${r.proofImg?proofThumbHtml(r.proofImg):''}</div>`).join('')}</div>
     ${e.gnotes?`<div class="ec-notes">💬 ${e.gnotes}</div>`:''}
     ${e.late&&e.reason?`<div class="ec-reason">📋 ${e.reason}</div>`:''}
-    ${(()=>{const r=entryReview(e);if(!r)return '';
-      return r.status==='rejected'
-        ?`<div class="ec-reason" style="color:var(--red)">✕ Rejected by ${escapeHtml(r.by||'manager')}${r.at?' on '+r.at:''}${r.note?' — '+escapeHtml(r.note):''}</div>`
-        :`<div class="ec-notes" style="color:var(--green)">☑ Approved by ${escapeHtml(r.by||'manager')}${r.at?' on '+r.at:''}</div>`;})()}
     ${canEdit?`<div class="ec-acts"><button class="btn btn-ghost btn-sm" onclick="editEntry('${e.id}')">✏ Edit</button><button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">✕ Delete</button></div>`:''}
   </div>`;
 }
@@ -1289,18 +1212,6 @@ function renderMgrDash(){
   const todayE=DB.entries.filter(e=>e.date===today);
   const totH=DB.entries.reduce((s,e)=>s+totalH(e),0);
   const late=DB.entries.filter(e=>e.late).length;
-  // Weekly report alert
-  const alertEl=document.getElementById('mgr-report-alert');
-  if(alertEl){
-    const status=getReportStatus();
-    if(status==='overdue'){
-      alertEl.innerHTML=`<div class="info-banner" style="background:var(--red-b);border-color:rgba(239,68,68,.3);color:var(--red);margin-bottom:1.25rem;padding:14px 18px;font-size:13px;cursor:pointer" onclick="gp('mgr-report',document.querySelectorAll('#sb-manager .nav')[3])"><span>⚠</span><span><strong>Weekly report is OVERDUE.</strong> Click to submit now.</span></div>`;
-    } else if(status==='pending'){
-      alertEl.innerHTML=`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1.25rem;padding:14px 18px;font-size:13px;cursor:pointer" onclick="gp('mgr-report',document.querySelectorAll('#sb-manager .nav')[3])"><span>⏱</span><span><strong>Weekly report due today by 2:00 PM.</strong> Click to submit.</span></div>`;
-    } else {
-      alertEl.innerHTML='';
-    }
-  }
   document.getElementById('mgr-stats').innerHTML=`
     <div class="sc"><div class="sl">Total Entries</div><div class="sv sv-ac">${DB.entries.length}</div><div class="ss">all time</div></div>
     <div class="sc"><div class="sl">Today</div><div class="sv sv-gr">${todayE.length}</div><div class="ss">${today}</div></div>
@@ -1333,68 +1244,8 @@ function renderLateList(){
 }
 
 // ════════════════════════════════════════
-//  MANAGER: REVIEW ENTRIES
-// ════════════════════════════════════════
-function unreviewedEntries(){return DB.entries.filter(e=>needsReview(e)&&!entryReview(e));}
-function missedReviewEntries(){return unreviewedEntries().filter(e=>reviewDeadlinePassed(e));}
-function renderMgrReview(){
-  const pending=unreviewedEntries().filter(e=>!reviewDeadlinePassed(e));
-  const missed=missedReviewEntries();
-  const reviewed=DB.entries.filter(e=>needsReview(e)&&entryReview(e));
-  document.getElementById('mgr-review-stats').innerHTML=`
-    <div class="sc"><div class="sl">To Review</div><div class="sv sv-am">${pending.length}</div><div class="ss">locks next day 1:00 PM</div></div>
-    <div class="sc"><div class="sl">Reviewed</div><div class="sv sv-gr">${reviewed.length}</div><div class="ss">all time</div></div>
-    <div class="sc"><div class="sl">Missed</div><div class="sv" style="color:var(--red)">${missed.length}</div><div class="ss">locked · reported to exec</div></div>`;
-  const el=document.getElementById('mgr-review-list');
-  let html=pending.length?[...pending].reverse().map(e=>`
-    <div>${entryCard(e,false)}
-      <div style="display:flex;gap:8px;margin:-8px 0 16px;align-items:center;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--ink3)">⏳ Review by ${fmtReviewDeadline(e)}</span>
-        <span style="flex:1"></span>
-        <button class="btn btn-primary btn-sm" onclick="reviewEntryAction('${e.id}','approved')">☑ Approve</button>
-        <button class="btn btn-danger btn-sm" onclick="reviewEntryAction('${e.id}','rejected')">✕ Reject</button>
-      </div>
-    </div>`).join(''):emptyState('☑️','Nothing awaiting review.');
-  if(missed.length){
-    html+=`<div class="ct" style="margin-top:1.5rem;color:var(--red)">Missed — review window closed (reported to executive)</div>`
-      +[...missed].reverse().map(e=>entryCard(e,false)).join('');
-  }
-  el.innerHTML=html;
-}
-async function reviewEntryAction(id,status){
-  const e=DB.entries.find(x=>String(x.id)===String(id));if(!e)return;
-  if(reviewDeadlinePassed(e)){toast('Review window closed (next day 1:00 PM). This entry is now reported to the executive.','err');renderMgrReview();return;}
-  let note='';
-  if(status==='rejected'){
-    note=(prompt('Reason for rejecting this entry:')||'').trim();
-    if(!note){toast('Rejection needs a reason.','err');return;}
-  } else if(!confirm('Approve this entry and its proof?'))return;
-  try{
-    await api('reviewEntry',{id,status,by:session.user.name,note,at:todayStr()+' '+nowTime()});
-    await syncAll();renderMgrReview();
-    toast(status==='approved'?'Entry approved.':'Entry rejected.','ok');
-  }catch(err){toast('Failed: '+err.message,'err');}
-}
-
-// ════════════════════════════════════════
 //  EXEC: COMPLIANCE
 // ════════════════════════════════════════
-function missedReviewDates(){return [...new Set(missedReviewEntries().map(e=>String(e.date)))].sort();}
-// Two consecutive missed working days = one −100 AED cut (non-overlapping
-// pairs). Saturday and Monday count as consecutive — Sunday is the day off.
-function consecutiveWorkdays(d1,d2){
-  const a=new Date(d1+'T00:00:00Z'),b=new Date(d2+'T00:00:00Z');
-  const gap=(b-a)/86400000;
-  if(gap===1)return true;
-  return gap===2&&new Date(a.getTime()+86400000).getUTCDay()===0;
-}
-function salaryCutPairs(){
-  const dates=missedReviewDates();const pairs=[];let i=0;
-  while(i<dates.length-1){
-    if(consecutiveWorkdays(dates[i],dates[i+1])){pairs.push([dates[i],dates[i+1]]);i+=2;}else i++;
-  }
-  return pairs;
-}
 function allProofs(){
   const out=[];
   [...DB.entries].reverse().forEach(e=>(e.rows||[]).forEach(r=>{
@@ -1403,28 +1254,12 @@ function allProofs(){
   return out;
 }
 function renderExecCompliance(){
-  const missed=missedReviewEntries();
-  const dates=missedReviewDates();
-  const pairs=salaryCutPairs();
   const proofs=allProofs();
-  const al=document.getElementById('comp-salary-alert');
-  if(pairs.length){
-    al.innerHTML=`<div class="info-banner" style="background:var(--red-b);border-color:rgba(239,68,68,.3);color:var(--red);margin-bottom:1.25rem;padding:14px 18px;font-size:13px;display:block">
-      <strong>⚠ Manager salary cut — reviews missed 2 days in a row.</strong>
-      <div style="margin-top:8px">${pairs.map(p=>`<div>• ${p[0]} &amp; ${p[1]} — entries left unreviewed past 1:00 PM → <strong>−100 AED</strong></div>`).join('')}</div>
-      <div style="margin-top:8px">Total: <strong>−${pairs.length*100} AED</strong></div>
-    </div>`;
-  } else if(dates.length){
-    al.innerHTML=`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1.25rem;padding:14px 18px;font-size:13px"><span>⏱</span><span>Reviews were missed on <strong>${dates.join(', ')}</strong>. Two consecutive missed days = −100 AED salary cut.</span></div>`;
-  } else al.innerHTML='';
+  const totalEntries=DB.entries.length;
   document.getElementById('comp-stats').innerHTML=`
-    <div class="sc"><div class="sl">Missed Reviews</div><div class="sv" style="color:var(--red)">${missed.length}</div><div class="ss">entries</div></div>
-    <div class="sc"><div class="sl">Missed Days</div><div class="sv sv-am">${dates.length}</div><div class="ss">${dates.length?'latest '+dates[dates.length-1]:'—'}</div></div>
-    <div class="sc"><div class="sl">Salary Cuts</div><div class="sv" style="color:var(--red)">${pairs.length?'−'+pairs.length*100+' AED':'0'}</div><div class="ss">2-day streaks</div></div>
-    <div class="sc"><div class="sl">Proofs</div><div class="sv sv-ac">${proofs.length}</div><div class="ss">uploaded</div></div>`;
-  document.getElementById('comp-missed-reviews').innerHTML=missed.length
-    ?[...missed].reverse().map(e=>entryCard(e,false)).join('')
-    :'<p style="font-size:13px;color:var(--ink3);padding:.5rem 0">No missed reviews.</p>';
+    <div class="sc"><div class="sl">Total Entries</div><div class="sv sv-ac">${totalEntries}</div><div class="ss">all time</div></div>
+    <div class="sc"><div class="sl">Staff</div><div class="sv sv-te">${DB.staff.length}</div><div class="ss">registered</div></div>
+    <div class="sc"><div class="sl">Proofs</div><div class="sv sv-gr">${proofs.length}</div><div class="ss">uploaded</div></div>`;
   renderCompMissed();
   renderProofGalleryList(proofs);
 }
@@ -1478,7 +1313,6 @@ function renderProofGalleryList(proofs){
       <div style="font-family:var(--font);font-weight:800;font-size:13px">${escapeHtml(p.staffName)}</div>
       <div style="font-size:11px;color:var(--ink3);margin-top:2px">${p.date} · ${escapeHtml(p.client)} · ${p.hours}h</div>
       ${proofThumbHtml(p.url)}
-      <div style="margin-top:6px">${reviewTag(p.e)}</div>
     </div>`).join(''):'<p style="font-size:13px;color:var(--ink3)">No proofs uploaded yet.</p>';
 }
 
@@ -1942,12 +1776,11 @@ function renderExecStaff(){
 
 function exportCSV(){
   if(!DB.entries.length){toast('Nothing to export.','err');return;}
-  const rows=[['Staff','Username','Date','Time','Client','Hours','Tasks','Notes','Status','Reason','Code','Issued By','Proof','Review','Reviewed By']];
+  const rows=[['Staff','Username','Date','Time','Client','Hours','Tasks','Notes','Status','Reason','Code','Issued By','Proof']];
   DB.entries.forEach(e=>{
     const code=e.usedCodeId?DB.codes.find(c=>String(c.id)===String(e.usedCodeId)):null;
-    const rv=entryReview(e);const rs=reviewState(e);
     (e.rows||[]).forEach(r=>{
-      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${code?code.code:''}"`,`"${code?(code.issuedByRole==='exec'?'Executive':code.issuedByName):''}"`,`"${r.proofImg||''}"`,rs==='legacy'?'':rs.charAt(0).toUpperCase()+rs.slice(1),`"${rv?rv.by||'':''}"`]);
+      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${code?code.code:''}"`,`"${code?(code.issuedByRole==='exec'?'Executive':code.issuedByName):''}"`,`"${r.proofImg||''}"`]);
     });
   });
   const csv=rows.map(r=>r.join(',')).join('\n');
@@ -1980,9 +1813,7 @@ function updateBadges(){
   const bm=document.getElementById('b-mylog');if(bm)bm.textContent=myCount;
   const bM=document.getElementById('b-mgr');if(bM)bM.textContent=total;
   const bP=document.getElementById('b-pend');if(bP)bP.textContent=lateCount;
-  const bRv=document.getElementById('b-review');if(bRv)bRv.textContent=unreviewedEntries().filter(e=>!reviewDeadlinePassed(e)).length;
   const bSl=document.getElementById('b-sales');if(bSl)bSl.textContent=(DB.leads||[]).filter(l=>!l.salesStatus).length;
-  const bComp=document.getElementById('b-exec-comp');if(bComp)bComp.textContent=missedReviewEntries().length;
   const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
   const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
   const bER=document.getElementById('b-exec-reports');if(bER)bER.textContent=(DB.reports||[]).length;
@@ -1998,14 +1829,6 @@ function updateBadges(){
   }
   const bgMT=document.getElementById('b-mgr-tasks');if(bgMT)bgMT.textContent=myAssigned;
   const beMT=document.getElementById('b-exec-tasks');if(beMT)beMT.textContent=myAssigned;
-  // Report status badge for manager
-  const bR=document.getElementById('b-report');
-  if(bR){
-    const status=getReportStatus();
-    if(status==='submitted'){bR.textContent='✓';bR.className='nbadge';bR.style.background='var(--green)';}
-    else if(status==='pending'){bR.textContent='●';bR.className='nbadge amber';}
-    else {bR.textContent='!';bR.className='nbadge red';}
-  }
 }
 
 // ════════════════════════════════════════
