@@ -1,7 +1,7 @@
 // WorkLog service worker — makes the app installable and keeps the shell working
 // offline. Network-first for navigations (so deploys are picked up immediately),
 // falling back to the cached shell when offline.
-const CACHE = 'worklog-v13';
+const CACHE = 'worklog-v14';
 const SHELL = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (event) => {

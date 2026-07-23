@@ -781,8 +781,18 @@ function normDateTime(v){
   }
   return v;
 }
+// Time-only fields (submittedAt, deadline) that Sheets turned into 1899-12-30
+// timestamps — show them as a plain HH:MM in Dubai time. Text like "3:00 PM"
+// passes through unchanged.
+function normTimeOnly(v){
+  if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(v)){
+    const d=new Date(v);
+    if(!isNaN(d.getTime()))return localTime(d);
+  }
+  return v;
+}
 function normalizeDB(db){
-  (db.entries||[]).forEach(e=>{e.date=normDate(e.date);});
+  (db.entries||[]).forEach(e=>{e.date=normDate(e.date);e.submittedAt=normTimeOnly(e.submittedAt);e.deadline=normTimeOnly(e.deadline);});
   (db.staff||[]).forEach(s=>{s.createdAt=normDate(s.createdAt);});
   (db.managers||[]).forEach(m=>{m.createdAt=normDate(m.createdAt);});
   (db.reports||[]).forEach(r=>{r.weekStart=normDate(r.weekStart);r.weekEnd=normDate(r.weekEnd);});
