@@ -17,6 +17,7 @@ const SHEETS = {
   reports:  ['id', 'weekStart', 'weekEnd', 'submittedAt', 'submittedBy', 'submittedById', 'breakdown', 'note', 'totalHours'],
   tasks:    ['id', 'title', 'description', 'assignedTo', 'assignedToName', 'createdByRole', 'createdById', 'createdByName', 'deadline', 'done', 'doneAt', 'staffNote', 'imageUrl', 'createdAt'],
   leads:    ['id', 'targetId', 'staffId', 'staffName', 'f1', 'f2', 'f3', 'success', 'createdAt', 'salesStatus', 'salesReason', 'salesFee', 'salesBy', 'salesAt'],
+  attendance: ['id', 'staffId', 'staffName', 'date', 'checkIn', 'checkOut', 'otHours', 'otNote', 'createdAt'],
   config:   ['key', 'value']
 };
 
@@ -61,6 +62,9 @@ function handleRequest(e) {
       case 'setLeadSuccess': result = updateField(ss, 'leads', params.id, 'success', params.value === 'true'); break;
       case 'setLeadSales': result = setLeadSales(ss, params); break;
       case 'deleteLead':   result = deleteRow(ss, 'leads', params.id); break;
+      case 'attnCheckIn':  result = attnUpsert(ss, params); break;
+      case 'attnCheckOut': result = attnUpsert(ss, params); break;
+      case 'attnOvertime': result = attnUpsert(ss, params); break;
       case 'setExecCode':  result = setConfig(ss, 'execCode', params.value); break;
       default: result = { error: 'Unknown action' };
     }
@@ -167,9 +171,37 @@ function getAll(ss) {
     createdAt: dateCellToString(l.createdAt, tz),
     success: l.success === true || l.success === 'TRUE' || l.success === 'true'
   }));
+  const rawAttendance = sheetToObjects(ss.getSheetByName('attendance'));
+  const attendance = rawAttendance.map(a => ({ ...a, date: dateCellToString(a.date, tz) }));
   const config = sheetToObjects(ss.getSheetByName('config'));
   const execCode = (config.find(c => c.key === 'execCode') || {}).value || DEFAULT_EXEC_CODE;
-  return { staff, managers, clients, entries, codes, reports, tasks, leads, execCode: String(execCode) };
+  return { staff, managers, clients, entries, codes, reports, tasks, leads, attendance, execCode: String(execCode) };
+}
+
+// Attendance: one record per staff per day. Check-in / check-out / overtime all
+// upsert into that day's row (finding by staffId + date, creating if absent).
+function attnUpsert(ss, params) {
+  const sh = ss.getSheetByName('attendance');
+  const headers = sheetHeaders(sh, 'attendance');
+  const col = h => headers.indexOf(h);
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col('staffId')]) === String(params.staffId) && String(data[i][col('date')]) === String(params.date)) {
+      if (params.checkIn) sh.getRange(i + 1, col('checkIn') + 1).setValue(params.checkIn);
+      if (params.checkOut) sh.getRange(i + 1, col('checkOut') + 1).setValue(params.checkOut);
+      if (params.otHours !== undefined && params.otHours !== '') sh.getRange(i + 1, col('otHours') + 1).setValue(params.otHours);
+      if (params.otNote !== undefined && params.otNote !== '') sh.getRange(i + 1, col('otNote') + 1).setValue(params.otNote);
+      return { ok: true, updated: true };
+    }
+  }
+  const obj = {
+    id: params.id || ('a' + Date.now()),
+    staffId: params.staffId, staffName: params.staffName, date: params.date,
+    checkIn: params.checkIn || '', checkOut: params.checkOut || '',
+    otHours: params.otHours || '', otNote: params.otNote || '', createdAt: params.date
+  };
+  sh.appendRow(headers.map(h => obj[h] !== undefined ? obj[h] : ''));
+  return { ok: true, created: true };
 }
 
 function addRow(ss, sheetName, obj) {

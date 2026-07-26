@@ -327,6 +327,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('my-logs',this)"><span class="nav-ic">📄</span>My Logs<span class="nbadge" id="b-mylog">0</span></div>
         <div class="nav" onclick="gp('my-tasks',this)"><span class="nav-ic">✅</span>My Tasks<span class="nbadge amber" id="b-mytasks">0</span></div>
         <div class="nav" onclick="gp('my-targets',this)"><span class="nav-ic">🎯</span>My Targets<span class="nbadge purple" id="b-mytargets">0</span></div>
+        <div class="nav" onclick="gp('my-attendance',this)"><span class="nav-ic">🕘</span>My Attendance<span class="nbadge amber" id="b-myattn"></span></div>
       </div>
       <div id="sb-manager" style="display:none">
         <div class="sbl">Dashboard</div>
@@ -351,6 +352,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
         <div class="nav" onclick="gp('exec-compliance',this)"><span class="nav-ic">🚨</span>Compliance</div>
         <div class="nav" onclick="gp('exec-salary',this)"><span class="nav-ic">💰</span>Salary</div>
+        <div class="nav" onclick="gp('exec-attendance',this)"><span class="nav-ic">🕘</span>Attendance</div>
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('exec-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-exec-tasks">0</span></div>
         <div class="sbl">Reports</div>
@@ -523,7 +525,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- EXEC: SALARY -->
       <div class="page" id="page-exec-salary">
-        <div class="ph"><div><div class="pt">Salary & Compliance</div><p class="ps">Monthly salary per staff after deductions — 50 AED per missed entry (from August 2026) and 5% for a missed lead target.</p></div></div>
+        <div class="ph"><div><div class="pt">Salary & Compliance</div><p class="ps">Monthly salary per staff: base × attendance (hours present ÷ expected, from Aug 2026), then −50 AED per missed entry (from Aug 2026) and −5% for a missed lead target.</p></div></div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
           <label style="font-size:12px;color:var(--ink3)">Month</label>
           <input type="month" id="sal-month" onchange="renderExecSalary()" style="width:auto"/>
@@ -532,6 +534,17 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="sal-banner"></div>
         <div class="card"><div class="ct">Salary Calculation</div><div id="sal-table"></div></div>
         <div id="sal-leads"></div>
+      </div>
+
+      <!-- EXEC: ATTENDANCE -->
+      <div class="page" id="page-exec-attendance">
+        <div class="ph"><div><div class="pt">Attendance</div><p class="ps">Hours worked vs expected (Mon–Fri 9h, Sat 6.5h, Sun off), overtime, and daily check-in/out records.</p></div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+          <label style="font-size:12px;color:var(--ink3)">Month</label>
+          <input type="month" id="attn-month" onchange="renderExecAttendance()" style="width:auto"/>
+        </div>
+        <div class="card"><div class="ct">Monthly summary</div><div id="attn-summary"></div></div>
+        <div class="card"><div class="ct">Daily records</div><div id="attn-records"></div></div>
       </div>
 
       <!-- EXEC: CODES -->
@@ -583,6 +596,12 @@ textarea{resize:vertical;line-height:1.6;}
       <div class="page" id="page-my-tasks">
         <div class="ph"><div><div class="pt">My Tasks</div><p class="ps">Tasks assigned to you. Tick when done — add a note and optionally one photo.</p></div></div>
         <div id="my-tasks-list"></div>
+      </div>
+
+      <!-- STAFF: MY ATTENDANCE -->
+      <div class="page" id="page-my-attendance">
+        <div class="ph"><div><div class="pt">My Attendance</div><p class="ps">Check in when you start and check out when you leave. Log any overtime worked outside office hours.</p></div></div>
+        <div id="my-attendance-wrap"></div>
       </div>
 
       <!-- MANAGER: TASKS -->
@@ -753,7 +772,37 @@ function resetBackend(){
 // ════════════════════════════════════════
 //  STATE (mirror of sheet data)
 // ════════════════════════════════════════
-let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], reports:[], tasks:[], leads:[], execCode:'99999' };
+let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], reports:[], tasks:[], leads:[], attendance:[], execCode:'99999' };
+
+// ── Attendance / HR ──────────────────────────────────────────
+// Office hours: Mon–Fri 10:00–19:00 (9h), Sat 10:00–16:30 (6.5h), Sun off.
+// Attendance affects pay proportionally from this month onward (no back-charge
+// for months before staff were checking in).
+const ATTENDANCE_START='2026-08';
+function expectedHoursForDay(dateStr){
+  const day=new Date(dateStr+'T00:00:00Z').getUTCDay(); // 0 Sun … 6 Sat
+  if(day===0)return 0;      // Sunday off
+  if(day===6)return 6.5;    // Saturday 10:00–16:30
+  return 9;                 // Mon–Fri 10:00–19:00
+}
+function officeHoursLabel(dateStr){
+  const day=new Date(dateStr+'T00:00:00Z').getUTCDay();
+  if(day===0)return 'Day off';
+  if(day===6)return '10:00 – 16:30';
+  return '10:00 – 19:00';
+}
+function attnFor(staffId,date){return (DB.attendance||[]).find(a=>String(a.staffId)===String(staffId)&&String(a.date)===String(date));}
+function parseHM(s){const m=String(s||'').match(/(\d{1,2}):(\d{2})/);return m?(+m[1]*60+ +m[2]):null;}
+function attnHoursWorked(a){
+  if(!a)return 0;
+  const i=parseHM(a.checkIn),o=parseHM(a.checkOut);
+  if(i==null||o==null)return 0;
+  let mins=o-i; if(mins<0)mins+=1440;
+  return mins/60;
+}
+// Hours that count toward pay: capped at the day's expected (extra time is
+// overtime, which is recorded separately and not auto-paid).
+function attnPresentHours(a){return Math.min(attnHoursWorked(a),expectedHoursForDay(a.date));}
 let session = { user:null, role:null };
 let editingId = null;
 let ceCount = 0;
@@ -798,6 +847,7 @@ function normalizeDB(db){
   (db.reports||[]).forEach(r=>{r.weekStart=normDate(r.weekStart);r.weekEnd=normDate(r.weekEnd);});
   (db.codes||[]).forEach(c=>{c.generatedDate=normDate(c.generatedDate);});
   (db.leads||[]).forEach(l=>{l.createdAt=normDate(l.createdAt);l.salesAt=normDateTime(l.salesAt);});
+  (db.attendance||[]).forEach(a=>{a.date=normDate(a.date);a.checkIn=normTimeOnly(a.checkIn);a.checkOut=normTimeOnly(a.checkOut);});
 }
 
 // ════════════════════════════════════════
@@ -988,7 +1038,9 @@ function gp(id,el){
     'mgr-sales':renderMgrSales,
     'exec-compliance':renderExecCompliance,
     'exec-salary':renderExecSalary,
+    'exec-attendance':renderExecAttendance,
     'my-targets':renderMyTargets,
+    'my-attendance':renderMyAttendance,
     'mgr-staff':renderStaffTable,
     'mgr-clients':renderClientList,
     'mgr-codes':renderMgrCodesPage,
@@ -1383,6 +1435,117 @@ async function deleteLead(id){
 }
 
 // ════════════════════════════════════════
+//  STAFF: MY ATTENDANCE
+// ════════════════════════════════════════
+function renderMyAttendance(){
+  const el=document.getElementById('my-attendance-wrap');if(!el)return;
+  const today=todayStr();
+  const rec=attnFor(session.user.id,today);
+  const exp=expectedHoursForDay(today);
+  const dayName=new Date(today+'T00:00:00+04:00').toLocaleDateString('en-GB',{weekday:'long',timeZone:'Asia/Dubai'});
+  const todayCard=`<div class="card">
+    <div class="ct">📅 Today — ${today} (${dayName})</div>
+    ${exp===0?`<p style="font-size:13px;color:var(--ink3)">Sunday is a day off — no attendance needed. You can still log overtime below.</p>`:`
+      <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Office hours today: <strong>${officeHoursLabel(today)}</strong> · expected <strong>${exp}h</strong></p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        ${!rec||!rec.checkIn
+          ?`<button class="btn btn-primary" onclick="attnCheckIn()">🟢 Check In</button>`
+          :`<span class="tag t-ok">🟢 In at ${rec.checkIn}</span>`}
+        ${rec&&rec.checkIn&&!rec.checkOut?`<button class="btn btn-danger" onclick="attnCheckOut()">🔴 Check Out</button>`:''}
+        ${rec&&rec.checkOut?`<span class="tag t-late">🔴 Out at ${rec.checkOut}</span><span class="tag t-pu">${attnHoursWorked(rec).toFixed(1)}h worked</span>`:''}
+      </div>`}
+  </div>`;
+  const otCard=`<div class="card">
+    <div class="ct">⏱ Log overtime (outside office hours)</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:8px">Recorded for the executive as a reference — not automatically added to pay.</p>
+    <div class="fg">
+      <div class="f"><label>Date</label><input type="date" id="ot-date" value="${today}"/></div>
+      <div class="f"><label>Overtime hours</label><input type="number" id="ot-hours" min="0.5" step="0.5" placeholder="e.g. 2"/></div>
+      <div class="f full"><label>What did you work on?</label><textarea id="ot-note" style="min-height:52px" placeholder="Describe the overtime work..."></textarea></div>
+    </div>
+    <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="attnLogOvertime()">＋ Log overtime</button>
+  </div>`;
+  const mine=[...(DB.attendance||[])].filter(a=>String(a.staffId)===String(session.user.id)).sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,30);
+  const hist=`<div class="card"><div class="ct">Recent attendance</div>${mine.length?`<table class="stbl"><thead><tr><th>Date</th><th>In</th><th>Out</th><th>Worked</th><th>Expected</th><th>Overtime</th></tr></thead><tbody>
+    ${mine.map(a=>`<tr><td>${a.date}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td><td>${attnHoursWorked(a)?attnHoursWorked(a).toFixed(1)+'h':'—'}</td><td>${expectedHoursForDay(a.date)}h</td><td>${a.otHours?parseFloat(a.otHours)+'h — '+escapeHtml(a.otNote||''):'—'}</td></tr>`).join('')}
+  </tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No attendance records yet.</p>'}</div>`;
+  el.innerHTML=todayCard+otCard+hist;
+}
+async function attnCheckIn(){
+  try{await api('attnCheckIn',{staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkIn:nowTime()});await syncAll();renderMyAttendance();toast('Checked in ✅','ok');}
+  catch(e){toast('Failed: '+e.message,'err');}
+}
+async function attnCheckOut(){
+  try{await api('attnCheckOut',{staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkOut:nowTime()});await syncAll();renderMyAttendance();toast('Checked out ✅','ok');}
+  catch(e){toast('Failed: '+e.message,'err');}
+}
+async function attnLogOvertime(){
+  const date=document.getElementById('ot-date').value;
+  const hours=parseFloat(document.getElementById('ot-hours').value)||0;
+  const note=document.getElementById('ot-note').value.trim();
+  if(!date||hours<=0){toast('Enter overtime date and hours.','err');return;}
+  if(!note){toast('Describe the overtime work.','err');return;}
+  try{await api('attnOvertime',{staffId:session.user.id,staffName:session.user.name,date,otHours:hours,otNote:note});await syncAll();renderMyAttendance();toast('Overtime logged.','ok');}
+  catch(e){toast('Failed: '+e.message,'err');}
+}
+
+// ════════════════════════════════════════
+//  EXEC: ATTENDANCE
+// ════════════════════════════════════════
+// Working days (Sundays off) in a month up to `end`, from feature launch onward.
+function attnWorkdays(month,end){
+  const days=[];let cur=month+'-01';
+  while(cur<=end&&days.length<32){
+    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
+    cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  }
+  return days;
+}
+function attnMonthlyForStaff(s,days){
+  let exp=0,pres=0,ot=0,daysPresent=0;
+  days.forEach(date=>{
+    if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
+    exp+=expectedHoursForDay(date);
+    const a=attnFor(s.id,date);
+    if(a){pres+=attnPresentHours(a);ot+=parseFloat(a.otHours)||0;if(a.checkIn)daysPresent++;}
+  });
+  return {exp,pres,ot,daysPresent};
+}
+function renderExecAttendance(){
+  const mEl=document.getElementById('attn-month');if(!mEl)return;
+  if(!mEl.value)mEl.value=todayStr().slice(0,7);
+  const month=mEl.value;
+  const monthStart=month+'-01';
+  const endD=new Date(Date.parse(monthStart+'T00:00:00Z'));endD.setUTCMonth(endD.getUTCMonth()+1);endD.setUTCDate(0);
+  const monthEnd=endD.toISOString().slice(0,10);
+  const yesterday=localDateStr(new Date(Date.now()-86400000));
+  const today=todayStr();
+  const countEnd=(today>monthEnd)?monthEnd:(today.slice(0,7)===month?today:monthEnd);
+  const days=attnWorkdays(month,countEnd);
+  document.getElementById('attn-summary').innerHTML=DB.staff.length?`
+    <table class="stbl"><thead><tr><th>Staff</th><th>Days present</th><th>Hours worked</th><th>Expected</th><th>Attendance</th><th>Overtime</th></tr></thead><tbody>
+    ${DB.staff.map(s=>{
+      const m=attnMonthlyForStaff(s,days);
+      const pct=m.exp>0?Math.round(m.pres/m.exp*100):0;
+      return `<tr>
+        <td style="font-family:var(--font);font-weight:800">${escapeHtml(s.name)}</td>
+        <td>${m.daysPresent} / ${days.length}</td>
+        <td>${m.pres.toFixed(1)}h</td>
+        <td>${m.exp.toFixed(1)}h</td>
+        <td><span class="tag ${pct>=95?'t-ok':(pct>=80?'t-pu':'t-late')}">${pct}%</span></td>
+        <td>${m.ot?m.ot.toFixed(1)+'h':'—'}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table>
+    <p style="font-size:11px;color:var(--ink3);margin-top:8px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). "Hours worked" is capped at each day's expected; extra time should be logged as overtime.</p>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
+  const recs=[...(DB.attendance||[])].filter(a=>String(a.date).slice(0,7)===month).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  document.getElementById('attn-records').innerHTML=recs.length?`
+    <table class="stbl"><thead><tr><th>Date</th><th>Staff</th><th>In</th><th>Out</th><th>Worked</th><th>Overtime</th></tr></thead><tbody>
+    ${recs.map(a=>`<tr><td>${a.date}</td><td>${escapeHtml(a.staffName)}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td><td>${attnHoursWorked(a)?attnHoursWorked(a).toFixed(1)+'h':'—'}</td><td>${a.otHours?parseFloat(a.otHours)+'h — '+escapeHtml(a.otNote||''):'—'}</td></tr>`).join('')}
+    </tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No records this month.</p>';
+}
+
+// ════════════════════════════════════════
 //  MANAGER: SALES PIPELINE
 // ════════════════════════════════════════
 let salesDraft={};
@@ -1463,6 +1626,7 @@ function renderExecSalary(){
   const monthOver=todayStr()>monthEnd;
   const countEnd=monthOver?monthEnd:(yesterday<monthEnd?yesterday:monthEnd);
   const cutsActive=month>=ENTRY_CUT_START;
+  const attnActive=month>=ATTENDANCE_START;
   const days=[];let cur=monthStart;
   while(cur<=countEnd&&days.length<32){
     if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
@@ -1470,6 +1634,7 @@ function renderExecSalary(){
   }
   const banner=document.getElementById('sal-banner');
   let notes=[];
+  if(!attnActive)notes.push('Attendance-based pay applies from August 2026 — for this month full base pay is used regardless of hours.');
   if(!cutsActive)notes.push('Entry deductions (50 AED each) apply from August 2026 — this month shows missed counts only, with no entry cut.');
   if(!monthOver)notes.push(`Month still in progress — the ${TARGET_CUT_PCT}% target cut only applies if the goal is still unmet at month end.`);
   banner.innerHTML=notes.length?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>ℹ️</span><span>${notes.join(' ')}</span></div>`:'';
@@ -1481,6 +1646,9 @@ function renderExecSalary(){
       const n=DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length;
       missedSlots+=Math.max(0,2-n);
     });
+    const att=attnMonthlyForStaff(s,days);
+    const attFactor=(attnActive&&att.exp>0)?Math.min(1,att.pres/att.exp):1;
+    const attPay=base!=null?Math.round(base*attFactor):null;
     const entryCut=cutsActive&&base!=null?missedSlots*ENTRY_CUT:0;
     const myT=targetsFor(s.name);
     let targetCut=0;
@@ -1490,25 +1658,29 @@ function renderExecSalary(){
       if(!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
       return `<span class="tag ${done?'t-ok':(monthOver?'t-late':'t-pu')}">${t.icon} ${ok}/${t.goal}${done?' ✓':(monthOver?' ✗':'')}</span>`;
     }).join(' '):'<span style="color:var(--ink3)">—</span>';
-    const finalPay=base!=null?base-entryCut-targetCut:null;
-    return {s,base,missedSlots,entryCut,targetHtml,targetCut,finalPay};
+    const finalPay=base!=null?attPay-entryCut-targetCut:null;
+    return {s,base,att,attFactor,attPay,missedSlots,entryCut,targetHtml,targetCut,finalPay};
   });
   const totBase=rows.reduce((a,r)=>a+(r.base||0),0);
   const totFinal=rows.reduce((a,r)=>a+(r.finalPay||0),0);
   document.getElementById('sal-table').innerHTML=`
-    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Final (AED)</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr>
+    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Final (AED)</th></tr></thead><tbody>
+    ${rows.map(r=>{
+      const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
+      return `<tr>
       <td style="font-family:var(--font);font-weight:800">${escapeHtml(r.s.name)}</td>
       <td>${r.base!=null?r.base.toLocaleString():'<span style="color:var(--ink3)">not set</span>'}</td>
+      <td>${attnActive?`<span class="tag ${pct>=95?'t-ok':(pct>=80?'t-pu':'t-late')}">${pct}%</span> <span style="font-size:11px;color:var(--ink3)">${r.att.pres.toFixed(1)}/${r.att.exp.toFixed(1)}h</span>`:'<span style="color:var(--ink3)">n/a</span>'}</td>
+      <td style="color:${attnActive&&r.attPay!=null&&r.attPay<r.base?'var(--amber)':'var(--ink2)'}">${r.attPay!=null?r.attPay.toLocaleString():'—'}</td>
       <td><span class="tag ${r.missedSlots?'t-late':'t-ok'}">${r.missedSlots}</span></td>
       <td style="color:${r.entryCut?'var(--red)':'var(--ink3)'}">${r.entryCut?'−'+r.entryCut.toLocaleString():'0'}</td>
       <td>${r.targetHtml}</td>
       <td style="color:${r.targetCut?'var(--red)':'var(--ink3)'}">${r.targetCut?'−'+r.targetCut.toLocaleString():'0'}</td>
       <td style="font-family:var(--font);font-weight:800;color:${r.finalPay!=null&&r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay!=null?r.finalPay.toLocaleString():'—'}</td>
-    </tr>`).join('')}
-    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
+    </tr>`;}).join('')}
+    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Missed entries counted over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Each missing entry slot (2 per day) counts once.</p>`;
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Attendance pay = base × (hours present ÷ expected). Missed entries: each of the 2 daily slots counts once.</p>`;
   document.getElementById('sal-leads').innerHTML=LEAD_TARGETS.map(t=>{
     const leads=leadsForTarget(t.id,month);
     const ok=leads.length;
@@ -1839,6 +2011,12 @@ function updateBadges(){
   }
   const bgMT=document.getElementById('b-mgr-tasks');if(bgMT)bgMT.textContent=myAssigned;
   const beMT=document.getElementById('b-exec-tasks');if(beMT)beMT.textContent=myAssigned;
+  // Attendance reminder dot: working day and not yet checked out.
+  const bAt=document.getElementById('b-myattn');
+  if(bAt&&session.user&&session.role==='staff'){
+    const today=todayStr();const rec=attnFor(session.user.id,today);
+    bAt.textContent=(expectedHoursForDay(today)>0&&(!rec||!rec.checkOut))?'●':'';
+  }
 }
 
 // ════════════════════════════════════════
