@@ -522,3 +522,28 @@ function zohoTest(){
   Logger.log(JSON.stringify(r));
   return r;
 }
+
+// One-time: paste the grant code (from api-console.zoho.com Self Client) into a
+// Script Property ZOHO_GRANT_CODE, then Run this once. It swaps the code for a
+// long-lived refresh token and saves it — after that, delete ZOHO_GRANT_CODE.
+function zohoExchangeGrant(){
+  const code = zohoProp('ZOHO_GRANT_CODE');
+  if (!code) throw new Error('Set ZOHO_GRANT_CODE in Script Properties first.');
+  const res = UrlFetchApp.fetch('https://accounts.zoho.' + zohoDC() + '/oauth/v2/token', {
+    method: 'post',
+    payload: {
+      grant_type: 'authorization_code',
+      client_id: zohoProp('ZOHO_CLIENT_ID'),
+      client_secret: zohoProp('ZOHO_CLIENT_SECRET'),
+      code: code
+    },
+    muteHttpExceptions: true
+  });
+  const j = JSON.parse(res.getContentText());
+  if (!j.refresh_token) throw new Error('No refresh token returned: ' + res.getContentText());
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('ZOHO_REFRESH_TOKEN', j.refresh_token);
+  props.deleteProperty('ZOHO_GRANT_CODE');
+  Logger.log('✅ Refresh token saved. Now run zohoTest().');
+  return '✅ Refresh token saved. Now run zohoTest().';
+}
