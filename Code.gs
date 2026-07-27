@@ -65,6 +65,7 @@ function handleRequest(e) {
       case 'attnCheckIn':  result = attnUpsert(ss, params); break;
       case 'attnCheckOut': result = attnUpsert(ss, params); break;
       case 'attnOvertime': result = attnUpsert(ss, params); break;
+      case 'deleteAttendance': result = deleteRow(ss, 'attendance', params.id); break;
       case 'setExecCode':  result = setConfig(ss, 'execCode', params.value); break;
       default: result = { error: 'Unknown action' };
     }
@@ -133,6 +134,14 @@ function dateCellToString(v, tz) {
   }
   return v;
 }
+// Same idea for time-only cells (checkIn/checkOut) that Sheets stored as a
+// time value — format in the sheet timezone so it round-trips exactly.
+function timeCellToString(v, tz) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, tz, 'HH:mm');
+  }
+  return v;
+}
 
 function getAll(ss) {
   const tz = ss.getSpreadsheetTimeZone();
@@ -172,7 +181,12 @@ function getAll(ss) {
     success: l.success === true || l.success === 'TRUE' || l.success === 'true'
   }));
   const rawAttendance = sheetToObjects(ss.getSheetByName('attendance'));
-  const attendance = rawAttendance.map(a => ({ ...a, date: dateCellToString(a.date, tz) }));
+  const attendance = rawAttendance.map(a => ({
+    ...a,
+    date: dateCellToString(a.date, tz),
+    checkIn: timeCellToString(a.checkIn, tz),
+    checkOut: timeCellToString(a.checkOut, tz)
+  }));
   const config = sheetToObjects(ss.getSheetByName('config'));
   const execCode = (config.find(c => c.key === 'execCode') || {}).value || DEFAULT_EXEC_CODE;
   return { staff, managers, clients, entries, codes, reports, tasks, leads, attendance, execCode: String(execCode) };
@@ -184,11 +198,16 @@ function attnUpsert(ss, params) {
   const sh = ss.getSheetByName('attendance');
   const headers = sheetHeaders(sh, 'attendance');
   const col = h => headers.indexOf(h);
+  const tz = ss.getSpreadsheetTimeZone();
   const data = sh.getDataRange().getValues();
+  // Write text-forced cells so Sheets never turns "10:05" or "2026-07-27" into
+  // a time/date serial (which caused mismatched rows and drifted times).
+  const setText = (r, c, v) => { const cell = sh.getRange(r, c + 1); cell.setNumberFormat('@'); cell.setValue(v); };
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][col('staffId')]) === String(params.staffId) && String(data[i][col('date')]) === String(params.date)) {
-      if (params.checkIn) sh.getRange(i + 1, col('checkIn') + 1).setValue(params.checkIn);
-      if (params.checkOut) sh.getRange(i + 1, col('checkOut') + 1).setValue(params.checkOut);
+    const rowDate = dateCellToString(data[i][col('date')], tz);
+    if (String(data[i][col('staffId')]) === String(params.staffId) && String(rowDate) === String(params.date)) {
+      if (params.checkIn) setText(i + 1, col('checkIn'), params.checkIn);
+      if (params.checkOut) setText(i + 1, col('checkOut'), params.checkOut);
       if (params.otHours !== undefined && params.otHours !== '') sh.getRange(i + 1, col('otHours') + 1).setValue(params.otHours);
       if (params.otNote !== undefined && params.otNote !== '') sh.getRange(i + 1, col('otNote') + 1).setValue(params.otNote);
       return { ok: true, updated: true };
@@ -200,7 +219,12 @@ function attnUpsert(ss, params) {
     checkIn: params.checkIn || '', checkOut: params.checkOut || '',
     otHours: params.otHours || '', otNote: params.otNote || '', createdAt: params.date
   };
-  sh.appendRow(headers.map(h => obj[h] !== undefined ? obj[h] : ''));
+  const r = sh.getLastRow() + 1;
+  headers.forEach((h, idx) => {
+    const v = obj[h] !== undefined ? obj[h] : '';
+    if (h === 'date' || h === 'checkIn' || h === 'checkOut' || h === 'createdAt') setText(r, idx, v);
+    else sh.getRange(r, idx + 1).setValue(v);
+  });
   return { ok: true, created: true };
 }
 
