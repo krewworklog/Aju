@@ -445,3 +445,80 @@ function setConfig(ss, key, value) {
   sh.appendRow([key, value]);
   return { ok: true };
 }
+
+// ══════════════════════════════════════════════════════════════
+//  ZOHO MAIL — send email from your Zoho address (server-side only)
+//  Credentials live ONLY in Script Properties (Apps Script → Project
+//  Settings → Script properties) — NEVER in the public frontend:
+//    ZOHO_CLIENT_ID       from api-console.zoho.com (Self Client)
+//    ZOHO_CLIENT_SECRET   from the same Self Client
+//    ZOHO_REFRESH_TOKEN   generated once via the grant-token flow
+//    ZOHO_FROM            your sending address, e.g. hr@yourdomain.com
+//    ZOHO_DC  (optional)  data centre: com | eu | in | sa | com.au  (default com)
+//  Needs the manifest scope https://www.googleapis.com/auth/script.external_request
+// ══════════════════════════════════════════════════════════════
+function zohoProp(k){ return PropertiesService.getScriptProperties().getProperty(k) || ''; }
+function zohoDC(){ return zohoProp('ZOHO_DC') || 'com'; }
+
+function zohoAccessToken(){
+  const res = UrlFetchApp.fetch('https://accounts.zoho.' + zohoDC() + '/oauth/v2/token', {
+    method: 'post',
+    payload: {
+      refresh_token: zohoProp('ZOHO_REFRESH_TOKEN'),
+      client_id: zohoProp('ZOHO_CLIENT_ID'),
+      client_secret: zohoProp('ZOHO_CLIENT_SECRET'),
+      grant_type: 'refresh_token'
+    },
+    muteHttpExceptions: true
+  });
+  const j = JSON.parse(res.getContentText());
+  if (!j.access_token) throw new Error('Zoho token error: ' + res.getContentText());
+  return j.access_token;
+}
+
+function zohoAccountId(token){
+  const cached = zohoProp('ZOHO_ACCOUNT_ID');
+  if (cached) return cached;
+  const res = UrlFetchApp.fetch('https://mail.zoho.' + zohoDC() + '/api/accounts', {
+    headers: { Authorization: 'Zoho-oauthtoken ' + token }, muteHttpExceptions: true
+  });
+  const j = JSON.parse(res.getContentText());
+  const acc = (j.data && j.data[0]) ? j.data[0] : null;
+  if (!acc) throw new Error('Zoho accounts error: ' + res.getContentText());
+  const id = String(acc.accountId);
+  PropertiesService.getScriptProperties().setProperty('ZOHO_ACCOUNT_ID', id);
+  return id;
+}
+
+// Send an email from the configured Zoho address. Returns {ok:true} or throws.
+function zohoSendMail(to, subject, htmlBody, cc){
+  const token = zohoAccessToken();
+  const accountId = zohoAccountId(token);
+  const payload = {
+    fromAddress: zohoProp('ZOHO_FROM'),
+    toAddress: to,
+    subject: subject || '',
+    content: htmlBody || '',
+    mailFormat: 'html'
+  };
+  if (cc) payload.ccAddress = cc;
+  const res = UrlFetchApp.fetch('https://mail.zoho.' + zohoDC() + '/api/accounts/' + accountId + '/messages', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Zoho-oauthtoken ' + token },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  const txt = res.getContentText();
+  let j; try { j = JSON.parse(txt); } catch (e) { throw new Error('Zoho send error: ' + txt); }
+  if (j.status && j.status.code !== 200) throw new Error('Zoho send failed: ' + txt);
+  return { ok: true };
+}
+
+// Run this manually from the editor to verify the connection. It emails your
+// own ZOHO_FROM address — check that mailbox for "WorkLog test".
+function zohoTest(){
+  const r = zohoSendMail(zohoProp('ZOHO_FROM'), 'WorkLog test ✅', '<p>Zoho Mail is connected to your WorkLog app.</p>');
+  Logger.log(JSON.stringify(r));
+  return r;
+}
