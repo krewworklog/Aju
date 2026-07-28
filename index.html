@@ -1585,15 +1585,17 @@ function salesCard(l){
     </div>
     ${cur==='Approved'?`<div class="f full"><label>Monthly marketing fee agreed (AED) *</label><input type="number" min="0" step="50" id="sales-fee-${l.id}" value="${l.salesFee||''}" placeholder="e.g. 1500"/></div>`:''}
     ${cur==='Denied'?`<div class="f full"><label>Reason for denial *</label><textarea id="sales-reason-${l.id}" style="min-height:52px" placeholder="Why was it denied?">${escapeHtml(l.salesReason||'')}</textarea></div>`:''}
-    ${l.salesStatus?`<div style="font-size:11px;color:var(--ink3);margin-top:6px">Last set by ${escapeHtml(l.salesBy||'—')}${l.salesAt?' · '+l.salesAt:''}${l.salesStatus==='Approved'&&l.salesFee?' · '+parseFloat(l.salesFee).toLocaleString()+' AED/mo':''}${l.salesStatus==='Denied'&&l.salesReason?' · '+escapeHtml(l.salesReason):''}</div>`:''}
-    ${cur?`<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveLeadSales('${l.id}')">💾 Save status</button>`:''}
+    <div class="f full"><label>Next step taken</label><input type="text" id="sales-next-${l.id}" value="${escapeHtml(l.salesNextStep||'')}" placeholder="e.g. Sent proposal — follow up Monday"/></div>
+    ${l.salesStatus||l.salesNextStep?`<div style="font-size:11px;color:var(--ink3);margin-top:6px">${l.salesStatus?`Last set by ${escapeHtml(l.salesBy||'—')}${l.salesAt?' · '+l.salesAt:''}${l.salesStatus==='Approved'&&l.salesFee?' · '+parseFloat(l.salesFee).toLocaleString()+' AED/mo':''}${l.salesStatus==='Denied'&&l.salesReason?' · '+escapeHtml(l.salesReason):''}`:''}${l.salesNextStep?`${l.salesStatus?' · ':''}Next step: ${escapeHtml(l.salesNextStep)}`:''}</div>`:''}
+    <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="saveLeadSales('${l.id}')">💾 Save</button>
   </div>`;
 }
 function selectSales(id,status){salesDraft[id]=status;renderMgrSales();}
 async function saveLeadSales(id){
   const l=(DB.leads||[]).find(x=>String(x.id)===String(id));if(!l)return;
   const status=salesDraft[id]!==undefined?salesDraft[id]:(l.salesStatus||'');
-  if(!status){toast('Pick a status.','err');return;}
+  const nextStep=((document.getElementById('sales-next-'+id)||{}).value||'').trim();
+  if(!status&&!nextStep){toast('Pick a status or enter a next step.','err');return;}
   let reason='',fee='';
   if(status==='Approved'){
     fee=(document.getElementById('sales-fee-'+id)||{}).value||'';
@@ -1604,10 +1606,10 @@ async function saveLeadSales(id){
     if(!reason){toast('Enter a reason for denial.','err');return;}
   }
   try{
-    await api('setLeadSales',{id,status,reason,fee,by:session.user.name,at:todayStr()+' '+nowTime()});
+    await api('setLeadSales',{id,status,reason,fee,nextStep,by:session.user.name,at:todayStr()+' '+nowTime()});
     delete salesDraft[id];
     await syncAll();renderMgrSales();
-    toast('Sales status saved.','ok');
+    toast('Sales updated.','ok');
   }catch(e){toast('Failed: '+e.message,'err');}
 }
 
@@ -1689,8 +1691,8 @@ function renderExecSalary(){
         <div class="ct" style="margin-bottom:0">${t.icon} ${t.label} — ${t.staff.join(' & ')}</div>
         <span class="tag ${ok>=t.goal?'t-ok':'t-pu'}">${ok} / ${t.goal} enquiries</span>
       </div>
-      ${leads.length?`<table class="stbl" style="margin-top:10px"><thead><tr><th>#</th>${t.fields.map(f=>`<th>${f.label.replace(' *','')}</th>`).join('')}<th>By</th><th>Date</th><th>Sales</th></tr></thead><tbody>
-        ${leads.map((l,i)=>`<tr><td style="color:var(--ink3)">${i+1}</td>${t.fields.map(f=>`<td>${escapeHtml(l[f.k]||'')}</td>`).join('')}<td>${escapeHtml(l.staffName)}</td><td style="color:var(--ink3)">${l.createdAt}</td><td>${salesStatusTag(l)}${l.salesStatus==='Approved'&&l.salesFee?` <span style="color:var(--ink3);font-size:11px">${parseFloat(l.salesFee).toLocaleString()} AED/mo</span>`:''}</td></tr>`).join('')}
+      ${leads.length?`<table class="stbl" style="margin-top:10px"><thead><tr><th>#</th>${t.fields.map(f=>`<th>${f.label.replace(' *','')}</th>`).join('')}<th>Date</th><th>Sales</th><th>Next step</th></tr></thead><tbody>
+        ${leads.map((l,i)=>`<tr><td style="color:var(--ink3)">${i+1}</td>${t.fields.map(f=>`<td>${escapeHtml(l[f.k]||'')}</td>`).join('')}<td style="color:var(--ink3)">${l.createdAt}</td><td>${salesStatusTag(l)}${l.salesStatus==='Approved'&&l.salesFee?` <span style="color:var(--ink3);font-size:11px">${parseFloat(l.salesFee).toLocaleString()} AED/mo</span>`:''}</td><td style="font-size:12px">${l.salesNextStep?escapeHtml(l.salesNextStep):'<span style="color:var(--ink3)">—</span>'}</td></tr>`).join('')}
       </tbody></table>`:'<p style="font-size:13px;color:var(--ink3);margin-top:10px">No enquiries logged this month.</p>'}
     </div>`;
   }).join('');

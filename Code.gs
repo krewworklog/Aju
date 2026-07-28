@@ -16,7 +16,7 @@ const SHEETS = {
   codes:    ['id', 'code', 'staffId', 'staffName', 'note', 'issuedByRole', 'issuedById', 'issuedByName', 'generatedAt', 'generatedDate', 'generatedTime', 'used', 'usedBy', 'usedByName', 'usedAt'],
   reports:  ['id', 'weekStart', 'weekEnd', 'submittedAt', 'submittedBy', 'submittedById', 'breakdown', 'note', 'totalHours'],
   tasks:    ['id', 'title', 'description', 'assignedTo', 'assignedToName', 'createdByRole', 'createdById', 'createdByName', 'deadline', 'done', 'doneAt', 'staffNote', 'imageUrl', 'createdAt'],
-  leads:    ['id', 'targetId', 'staffId', 'staffName', 'f1', 'f2', 'f3', 'success', 'createdAt', 'salesStatus', 'salesReason', 'salesFee', 'salesBy', 'salesAt'],
+  leads:    ['id', 'targetId', 'staffId', 'staffName', 'f1', 'f2', 'f3', 'success', 'createdAt', 'salesStatus', 'salesReason', 'salesFee', 'salesBy', 'salesAt', 'salesNextStep'],
   attendance: ['id', 'staffId', 'staffName', 'date', 'checkIn', 'checkOut', 'otHours', 'otNote', 'createdAt'],
   config:   ['key', 'value']
 };
@@ -384,6 +384,7 @@ function setLeadSales(ss, params) {
       set('salesFee', params.fee || '');
       set('salesBy', params.by || '');
       set('salesAt', params.at || '');
+      if (params.nextStep !== undefined) set('salesNextStep', params.nextStep || '');
       return { ok: true };
     }
   }
