@@ -42,6 +42,7 @@ function handleRequest(e) {
     const action = params.action;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     ensureSheets(ss);
+    try { ensureMonthlyReportTasks(ss); } catch (e) { /* never block a request on this */ }
 
     let result;
     switch (action) {
@@ -731,4 +732,47 @@ function submitIncReport(ss, params) {
     cell.setValue(obj[h] !== undefined ? obj[h] : '');
   });
   return { ok: true, created: true, onTime: onTime, url: url };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AUTO TASKS — on the 1st request of each month, every staff member gets a
+//  task to upload the previous month's report (due the 5th, 7 PM Dubai).
+//  Guarded by a config key so it can only ever run once per month.
+// ══════════════════════════════════════════════════════════════
+function ensureMonthlyReportTasks(ss) {
+  const tz = ss.getSpreadsheetTimeZone();
+  const month = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+  const cache = CacheService.getScriptCache();
+  if (cache.get('rptTasks_' + month) === '1') return;
+
+  const cfg = ss.getSheetByName('config');
+  const data = cfg.getDataRange().getValues();
+  let row = -1, done = '';
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === 'reportTasksMonth') { row = i + 1; done = String(data[i][1]); break; }
+  }
+  if (done === month) { cache.put('rptTasks_' + month, '1', 21600); return; }
+
+  // previous month, e.g. "July 2026"
+  const d = new Date(); d.setDate(1); d.setDate(0);
+  const prevName = Utilities.formatDate(d, tz, 'MMMM yyyy');
+  const deadline = month + '-05T19:00';
+
+  const tasksSh = ss.getSheetByName('tasks');
+  const headers = sheetHeaders(tasksSh, 'tasks');
+  const staff = sheetToObjects(ss.getSheetByName('staff'));
+  staff.forEach(s => {
+    const obj = {
+      id: 't' + Date.now() + Math.floor(Math.random() * 100000),
+      title: 'Monthly report — ' + prevName,
+      description: 'Upload your ' + prevName + ' monthly report as a PDF, covering each client you handle. Submit it on your Increment page before the 5th.',
+      assignedTo: s.id, assignedToName: s.name,
+      createdByRole: 'exec', createdById: 'system', createdByName: 'Auto',
+      deadline: deadline, done: false, doneAt: '', staffNote: '', imageUrl: '',
+      createdAt: new Date().toISOString()
+    };
+    tasksSh.appendRow(headers.map(h => obj[h] !== undefined ? obj[h] : ''));
+  });
+  if (row > 0) cfg.getRange(row, 2).setValue(month); else cfg.appendRow(['reportTasksMonth', month]);
+  cache.put('rptTasks_' + month, '1', 21600);
 }

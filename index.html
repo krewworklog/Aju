@@ -477,13 +477,10 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- EXEC: OVERVIEW -->
       <div class="page" id="page-exec-dash">
-        <div class="ph"><div><div class="pt">Executive Overview</div><p class="ps">High-level team performance summary.</p></div><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
+        <div class="ph"><div><div class="pt">Executive Overview</div><p class="ps">Who's in, who's late, and whether entries are being submitted — today and this month.</p></div><button class="btn btn-ghost btn-sm" onclick="exportCSV()">⬇ Export CSV</button></div>
         <div class="sg" id="exec-stats"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
-          <div class="card"><div class="ct">Top Staff by Hours</div><div class="bc" id="ebc-staff"></div></div>
-          <div class="card"><div class="ct">Top Clients by Hours</div><div class="bc" id="ebc-client"></div></div>
-        </div>
-        <div class="card"><div class="ct">7-Day Submission Trend</div><div id="trend-tbl"></div></div>
+        <div class="card" style="margin-bottom:1rem"><div class="ct" id="ov-today-title">Today</div><div id="ov-today"></div></div>
+        <div class="card"><div class="ct" id="ov-month-title">This month</div><div id="ov-month"></div></div>
       </div>
 
       <!-- EXEC: ALL LOGS -->
@@ -503,7 +500,14 @@ textarea{resize:vertical;line-height:1.6;}
       </div>
 
       <div class="page" id="page-exec-staff">
-        <div class="ph"><div><div class="pt">Staff Analytics</div><p class="ps">Individual performance.</p></div></div>
+        <div class="ph"><div><div class="pt">Staff Analytics</div><p class="ps">Individual performance, month by month.</p></div></div>
+        <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:1rem">
+          <div><label style="font-size:12px;color:var(--ink3);display:block;margin-bottom:4px">Month</label><input type="month" id="es-month" style="width:auto" onchange="document.getElementById('es-from').value='';document.getElementById('es-to').value='';renderExecStaff()"/></div>
+          <div style="font-size:12px;color:var(--ink3);padding-bottom:10px">or custom range:</div>
+          <div><label style="font-size:12px;color:var(--ink3);display:block;margin-bottom:4px">From</label><input type="date" id="es-from" style="width:auto" onchange="renderExecStaff()"/></div>
+          <div><label style="font-size:12px;color:var(--ink3);display:block;margin-bottom:4px">To</label><input type="date" id="es-to" style="width:auto" onchange="renderExecStaff()"/></div>
+          <button class="btn btn-ghost btn-sm" style="margin-bottom:1px" onclick="document.getElementById('es-from').value='';document.getElementById('es-to').value='';renderExecStaff()">Clear range</button>
+        </div>
         <div id="exec-staff-data"></div>
       </div>
 
@@ -890,6 +894,12 @@ function officeHoursLabel(dateStr){
 }
 function attnFor(staffId,date){return (DB.attendance||[]).find(a=>String(a.staffId)===String(staffId)&&String(a.date)===String(date));}
 function parseHM(s){const m=String(s||'').match(/(\d{1,2}):(\d{2})/);return m?(+m[1]*60+ +m[2]):null;}
+// Official window in minutes-of-day. Sunday returns null.
+function officeWindow(dateStr){
+  const day=new Date(dateStr+'T00:00:00Z').getUTCDay();
+  if(day===0)return null;
+  return { start:10*60, end: day===6 ? 16*60+30 : 19*60 };
+}
 function attnHoursWorked(a){
   if(!a)return 0;
   const i=parseHM(a.checkIn),o=parseHM(a.checkOut);
@@ -897,9 +907,21 @@ function attnHoursWorked(a){
   let mins=o-i; if(mins<0)mins+=1440;
   return mins/60;
 }
-// Hours that count toward pay: capped at the day's expected (extra time is
-// overtime, which is recorded separately and not auto-paid).
-function attnPresentHours(a){return Math.min(attnHoursWorked(a),expectedHoursForDay(a.date));}
+// Hours that count toward pay: ONLY time inside the official window
+// (10:00–19:00, Sat 10:00–16:30). Arriving early or staying late never adds,
+// so a short day can never be compensated on another day.
+function attnPresentHours(a){
+  if(!a)return 0;
+  const w=officeWindow(a.date); if(!w)return 0;
+  const i=parseHM(a.checkIn),o=parseHM(a.checkOut);
+  if(i==null||o==null)return 0;
+  const eff=Math.min(o,w.end)-Math.max(i,w.start);
+  return Math.max(0,eff)/60;
+}
+// Minutes late arriving / leaving early, for the day's official window.
+function attnLateBy(a){ if(!a)return 0; const w=officeWindow(a.date); const i=parseHM(a.checkIn); return (w&&i!=null&&i>w.start)?i-w.start:0; }
+function attnEarlyBy(a){ if(!a)return 0; const w=officeWindow(a.date); const o=parseHM(a.checkOut); return (w&&o!=null&&o<w.end)?w.end-o:0; }
+function fmtMins(m){ return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`; }
 let session = { user:null, role:null };
 let editingId = null;
 let ceCount = 0;
@@ -1649,7 +1671,7 @@ function renderExecAttendance(){
       </tr>`;
     }).join('')}
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:8px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). "Hours worked" is capped at each day's expected; extra time should be logged as overtime.</p>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
+    <p style="font-size:11px;color:var(--ink3);margin-top:8px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). "Hours worked" counts only time inside official hours (10:00–19:00, Sat 10:00–16:30) — early arrival or staying late never compensates for a short day; extra time goes in the overtime log.</p>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
   const recs=[...(DB.attendance||[])].filter(a=>String(a.date).slice(0,7)===month).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   document.getElementById('attn-records').innerHTML=recs.length?`
     <table class="stbl"><thead><tr><th>Date</th><th>Staff</th><th>In</th><th>Out</th><th>Worked</th><th>Overtime</th></tr></thead><tbody>
@@ -2244,34 +2266,90 @@ async function revokeCode(id){
 }
 
 function renderExecDash(){
-  const totH=DB.entries.reduce((s,e)=>s+totalH(e),0);
-  const staffSet=new Set(DB.entries.map(e=>e.staffId));
-  const clientSet=new Set();DB.entries.forEach(e=>(e.rows||[]).forEach(r=>clientSet.add(r.client)));
-  const compliance=DB.entries.length?Math.round(DB.entries.filter(e=>!e.late).length/DB.entries.length*100):100;
-  const activeCodes=DB.codes.filter(c=>!c.used).length;
+  const t=todayStr(), month=t.slice(0,7);
+  const workday=expectedHoursForDay(t)>0;
+  const staff=DB.staff;
+  // per-staff today + month picture
+  const rows=staff.map(s=>{
+    const a=attnFor(s.id,t);
+    const entriesToday=Math.min(2,DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===t).length);
+    const monthAtt=(DB.attendance||[]).filter(x=>String(x.staffId)===String(s.id)&&String(x.date).slice(0,7)===month);
+    const lateCount=monthAtt.filter(x=>attnLateBy(x)>0).length;
+    const earlyCount=monthAtt.filter(x=>attnEarlyBy(x)>0).length;
+    const comp=incCompliance(s,month);
+    return {s,a,entriesToday,lateCount,earlyCount,comp};
+  });
+  const inToday=rows.filter(r=>r.a&&r.a.checkIn).length;
+  const lateToday=rows.filter(r=>r.a&&attnLateBy(r.a)>0);
+  const notIn=rows.filter(r=>!r.a||!r.a.checkIn);
+  const entriesToday=rows.reduce((s,r)=>s+r.entriesToday,0);
+  const entriesExpected=staff.length*2;
+  const avgComp=rows.length?Math.round(rows.reduce((s,r)=>s+r.comp.pct,0)/rows.length):100;
+  const totLate=rows.reduce((s,r)=>s+r.lateCount,0);
+  const totEarly=rows.reduce((s,r)=>s+r.earlyCount,0);
   document.getElementById('exec-stats').innerHTML=`
-    <div class="sc"><div class="sl">Total Logs</div><div class="sv sv-ac">${DB.entries.length}</div><div class="ss">all time</div></div>
-    <div class="sc"><div class="sl">Active Staff</div><div class="sv sv-gr">${staffSet.size}</div><div class="ss">≥ 1 entry</div></div>
-    <div class="sc"><div class="sl">Total Hours</div><div class="sv sv-pu">${totH.toFixed(1)}</div><div class="ss">logged</div></div>
-    <div class="sc"><div class="sl">Clients</div><div class="sv sv-am">${clientSet.size}</div><div class="ss">served</div></div>
-    <div class="sc"><div class="sl">Compliance</div><div class="sv sv-gr">${compliance}%</div><div class="ss">on-time</div></div>
-    <div class="sc"><div class="sl">Active Codes</div><div class="sv sv-pu">${activeCodes}</div><div class="ss">unused</div></div>`;
-  barChart('ebc-staff',staffHoursMap());
-  barChart('ebc-client',clientHoursMap());
-  const days=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(localDateStr(d));}
-  const sc=DB.staff.length||1;
-  document.getElementById('trend-tbl').innerHTML=`<table class="etbl"><thead><tr><th>Date</th><th>Entries</th><th>Hours</th><th>Rate</th></tr></thead><tbody>${days.map(d=>{const de=DB.entries.filter(e=>e.date===d);const h=de.reduce((s,e)=>s+totalH(e),0).toFixed(1);const rate=Math.min(Math.round(de.length/sc*100),100);return `<tr><td>${d}</td><td>${de.length}</td><td>${h}h</td><td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:5px;background:var(--s3);border-radius:3px;overflow:hidden"><div style="width:${rate}%;height:100%;background:var(--accent);border-radius:3px"></div></div><span style="font-size:12px;color:var(--ink3);width:34px">${rate}%</span></div></td></tr>`;}).join('')}</tbody></table>`;
+    <div class="sc"><div class="sl">Entries today</div><div class="sv ${entriesToday>=entriesExpected?'sv-gr':'sv-am'}">${entriesToday}/${entriesExpected}</div><div class="ss">2 per staff</div></div>
+    <div class="sc"><div class="sl">Checked in</div><div class="sv ${workday&&inToday<staff.length?'sv-am':'sv-gr'}">${inToday}/${staff.length}</div><div class="ss">${workday?'today':'day off'}</div></div>
+    <div class="sc"><div class="sl">Late today</div><div class="sv ${lateToday.length?'sv-am':'sv-gr'}">${lateToday.length}</div><div class="ss">after 10:00</div></div>
+    <div class="sc"><div class="sl">Entry compliance</div><div class="sv ${avgComp>=95?'sv-gr':'sv-am'}">${avgComp}%</div><div class="ss">team · ${month}</div></div>
+    <div class="sc"><div class="sl">Late arrivals</div><div class="sv ${totLate?'sv-am':'sv-gr'}">${totLate}</div><div class="ss">${month}</div></div>
+    <div class="sc"><div class="sl">Early departures</div><div class="sv ${totEarly?'sv-am':'sv-gr'}">${totEarly}</div><div class="ss">${month}</div></div>`;
+  document.getElementById('ov-today-title').textContent=`Today — ${t}${workday?'':' (day off)'}`;
+  document.getElementById('ov-today').innerHTML=`
+    <table class="etbl"><thead><tr><th>Staff</th><th>In</th><th>Out</th><th>Status</th><th>Entries today</th></tr></thead><tbody>
+    ${rows.map(r=>{
+      const late=r.a?attnLateBy(r.a):0, early=r.a?attnEarlyBy(r.a):0;
+      let status;
+      if(!workday)status='<span style="color:var(--ink3)">—</span>';
+      else if(!r.a||!r.a.checkIn)status='<span class="tag t-late">Not checked in</span>';
+      else{
+        const tags=[];
+        if(late>0)tags.push(`<span class="tag t-late">Late ${fmtMins(late)}</span>`);
+        if(r.a.checkOut&&early>0)tags.push(`<span class="tag t-late">Left ${fmtMins(early)} early</span>`);
+        if(!tags.length)tags.push('<span class="tag t-ok">✓ On time</span>');
+        status=tags.join(' ');
+      }
+      return `<tr><td style="font-family:var(--font);font-weight:800">${escapeHtml(r.s.name)}</td>
+        <td>${r.a&&r.a.checkIn?r.a.checkIn:'—'}</td><td>${r.a&&r.a.checkOut?r.a.checkOut:'—'}</td>
+        <td>${status}</td>
+        <td><span class="tag ${r.entriesToday>=2?'t-ok':(r.entriesToday===1?'t-pu':'t-late')}">${r.entriesToday}/2</span></td></tr>`;
+    }).join('')}
+    </tbody></table>`;
+  document.getElementById('ov-month-title').textContent=`This month — ${month}`;
+  document.getElementById('ov-month').innerHTML=`
+    <table class="etbl"><thead><tr><th>Staff</th><th>Entry compliance</th><th>Missed entries</th><th>Late arrivals</th><th>Early departures</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td style="font-family:var(--font);font-weight:800">${escapeHtml(r.s.name)}</td>
+      <td><span class="tag ${r.comp.pct>=95?'t-ok':(r.comp.pct>=80?'t-pu':'t-late')}">${r.comp.pct}%</span> <span style="font-size:11px;color:var(--ink3)">${r.comp.got}/${r.comp.expected}</span></td>
+      <td>${r.comp.missed?`<span class="tag t-late">${r.comp.missed}</span>`:'<span style="color:var(--ink3)">0</span>'}</td>
+      <td>${r.lateCount?`<span class="tag t-late">${r.lateCount}×</span>`:'<span style="color:var(--ink3)">—</span>'}</td>
+      <td>${r.earlyCount?`<span class="tag t-late">${r.earlyCount}×</span>`:'<span style="color:var(--ink3)">—</span>'}</td></tr>`).join('')}
+    </tbody></table>
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Late = check-in after 10:00. Early = check-out before 19:00 (Sat 16:30). Compliance = submitted entry slots ÷ expected (2 per working day, Sundays off).</p>`;
 }
 function renderExecEntries(){
   const nf=document.getElementById('ef-name').value.toLowerCase();
   const cf=document.getElementById('ef-client').value;
   const df=document.getElementById('ef-date').value;
-  const data=[...DB.entries].reverse().filter(e=>{
+  const data=DB.entries.filter(e=>{
     if(nf&&!String(e.staffName).toLowerCase().includes(nf))return false;
     if(cf&&!(e.rows||[]).some(r=>r.client===cf))return false;
     if(df&&e.date!==df)return false;return true;
   });
-  document.getElementById('exec-entries-list').innerHTML=data.length?data.map(e=>entryCard(e,false)).join(''):emptyState('📭','No entries.');
+  // Group by date (newest first); within a day, by staff name then Entry 1/2 —
+  // so each person's day reads together instead of entries interleaving.
+  const byDate={};
+  data.forEach(e=>{ (byDate[e.date]=byDate[e.date]||[]).push(e); });
+  const dates=Object.keys(byDate).sort((a,b)=>String(b).localeCompare(String(a)));
+  const wd=d=>new Date(d+'T00:00:00+04:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Dubai'});
+  document.getElementById('exec-entries-list').innerHTML=dates.length?dates.map(d=>{
+    const list=byDate[d].sort((a,b)=>String(a.staffName).localeCompare(String(b.staffName))||(Number(a.entry)||0)-(Number(b.entry)||0));
+    const h=list.reduce((s,e)=>s+totalH(e),0);
+    return `<div style="display:flex;align-items:center;gap:10px;margin:1.4rem 0 .7rem">
+      <div style="font-family:var(--font);font-weight:800;font-size:14px">${d}</div>
+      <div style="font-size:12px;color:var(--ink3)">${wd(d)} · ${list.length} entr${list.length===1?'y':'ies'} · ${h.toFixed(1)}h</div>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>`+list.map(e=>entryCard(e,false)).join('');
+  }).join(''):emptyState('📭','No entries.');
 }
 function renderExecClients(){
   const map={};DB.entries.forEach(e=>(e.rows||[]).forEach(r=>{if(!map[r.client])map[r.client]={hours:0,staff:new Set(),count:0};map[r.client].hours+=parseFloat(r.hours)||0;map[r.client].staff.add(e.staffId);map[r.client].count++;}));
@@ -2280,10 +2358,33 @@ function renderExecClients(){
   el.innerHTML=sorted.length?`<div class="sg">${sorted.map(([n,d])=>`<div class="sc"><div class="sl">${n}</div><div class="sv sv-ac">${d.hours.toFixed(1)}<span style="font-size:16px;color:var(--ink3)">h</span></div><div class="ss">${d.count} entries · ${d.staff.size} staff</div></div>`).join('')}</div>`:emptyState('📭','No data.');
 }
 function renderExecStaff(){
-  const map={};DB.entries.forEach(e=>{if(!map[e.staffId])map[e.staffId]={name:e.staffName,hours:0,entries:0,lateCount:0,clients:new Set()};map[e.staffId].hours+=totalH(e);map[e.staffId].entries++;if(e.late)map[e.staffId].lateCount++;(e.rows||[]).forEach(r=>map[e.staffId].clients.add(r.client));});
+  const mEl=document.getElementById('es-month');
+  if(mEl&&!mEl.value)mEl.value=todayStr().slice(0,7);
+  const from=document.getElementById('es-from').value, to=document.getElementById('es-to').value;
+  // Custom range wins when both dates are set; otherwise the selected month.
+  const custom=from&&to;
+  const month=mEl?mEl.value:todayStr().slice(0,7);
+  const inRange=d=>custom ? (d>=from&&d<=to) : String(d).slice(0,7)===month;
+  const label=custom?`${from} → ${to}`:month;
+  const entries=DB.entries.filter(e=>inRange(e.date));
+  const att=(DB.attendance||[]).filter(a=>inRange(a.date));
+  const map={};
+  DB.staff.forEach(s=>{map[s.id]={name:s.name,hours:0,entries:0,late:0,clients:new Set(),lateArr:0,earlyLeft:0,present:0,attExp:0};});
+  entries.forEach(e=>{const m=map[e.staffId];if(!m)return;m.hours+=totalH(e);m.entries++;if(e.late)m.late++;(e.rows||[]).forEach(r=>m.clients.add(r.client));});
+  att.forEach(a=>{const m=map[a.staffId];if(!m)return;if(attnLateBy(a)>0)m.lateArr++;if(attnEarlyBy(a)>0)m.earlyLeft++;m.present+=attnPresentHours(a);m.attExp+=expectedHoursForDay(a.date);});
   const sorted=Object.values(map).sort((a,b)=>b.hours-a.hours);
   const el=document.getElementById('exec-staff-data');
-  el.innerHTML=sorted.length?`<table class="etbl"><thead><tr><th>Name</th><th>Hours</th><th>Entries</th><th>Clients</th><th>Late</th><th>Compliance</th></tr></thead><tbody>${sorted.map(s=>{const comp=s.entries?Math.round((s.entries-s.lateCount)/s.entries*100):100;return `<tr><td style="font-family:var(--font);font-weight:800">${s.name}</td><td><strong>${s.hours.toFixed(1)}h</strong></td><td>${s.entries}</td><td>${s.clients.size}</td><td>${s.lateCount>0?`<span class="tag t-late">${s.lateCount}</span>`:'-'}</td><td><span class="tag ${comp>=90?'t-ok':comp>=70?'t-late':'t-pend'}">${comp}%</span></td></tr>`;}).join('')}</tbody></table>`:emptyState('📭','No data.');
+  el.innerHTML=sorted.length?`
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:10px">Showing: <strong style="color:var(--ink)">${label}</strong></div>
+    <table class="etbl"><thead><tr><th>Name</th><th>Hours logged</th><th>Entries</th><th>Clients</th><th>Late entries</th><th>Office hours</th><th>Late arrivals</th><th>Left early</th></tr></thead><tbody>
+    ${sorted.map(s=>`<tr><td style="font-family:var(--font);font-weight:800">${escapeHtml(s.name)}</td>
+      <td><strong>${s.hours.toFixed(1)}h</strong></td><td>${s.entries}</td><td>${s.clients.size}</td>
+      <td>${s.late?`<span class="tag t-late">${s.late}</span>`:'—'}</td>
+      <td>${s.attExp?`${s.present.toFixed(1)} / ${s.attExp.toFixed(1)}h`:'<span style="color:var(--ink3)">—</span>'}</td>
+      <td>${s.lateArr?`<span class="tag t-late">${s.lateArr}×</span>`:'—'}</td>
+      <td>${s.earlyLeft?`<span class="tag t-late">${s.earlyLeft}×</span>`:'—'}</td></tr>`).join('')}
+    </tbody></table>
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Office hours count only time inside 10:00–19:00 (Sat 10:00–16:30) on days with a check-in/out in this period.</p>`:emptyState('📭','No data.');
 }
 
 function exportCSV(){
