@@ -18,6 +18,14 @@ const SHEETS = {
   tasks:    ['id', 'title', 'description', 'assignedTo', 'assignedToName', 'createdByRole', 'createdById', 'createdByName', 'deadline', 'done', 'doneAt', 'staffNote', 'imageUrl', 'createdAt'],
   leads:    ['id', 'targetId', 'staffId', 'staffName', 'f1', 'f2', 'f3', 'success', 'createdAt', 'salesStatus', 'salesReason', 'salesFee', 'salesBy', 'salesAt', 'salesNextStep'],
   attendance: ['id', 'staffId', 'staffName', 'date', 'checkIn', 'checkOut', 'otHours', 'otNote', 'createdAt'],
+  // Salary Increment Program
+  incMembers:  ['id', 'staffId', 'staffName', 'joinedAt', 'active'],
+  // What each client is owed each month, per service (from the onboarding form)
+  deliverables:['id', 'client', 'service', 'qty', 'note'],
+  // A staff member ticking off a delivered item for a given month
+  incWork:     ['id', 'month', 'staffId', 'staffName', 'client', 'service', 'done', 'doneAt', 'note'],
+  // Monthly PDF report, due by the 5th of the following month
+  incReports:  ['id', 'month', 'staffId', 'staffName', 'fileUrl', 'fileName', 'submittedAt', 'onTime'],
   config:   ['key', 'value']
 };
 
@@ -68,6 +76,14 @@ function handleRequest(e) {
       case 'attnOvertime': result = attnUpsert(ss, params); break;
       case 'deleteAttendance': result = deleteRow(ss, 'attendance', params.id); break;
       case 'setExecCode':  result = setConfig(ss, 'execCode', params.value); break;
+      // ---- Salary Increment Program ----
+      case 'incJoin':      result = incJoin(ss, params); break;
+      case 'incLeave':     result = incSetActive(ss, params.staffId, false); break;
+      case 'addDeliverable':    result = addRow(ss, 'deliverables', JSON.parse(params.data)); break;
+      case 'deleteDeliverable': result = deleteRow(ss, 'deliverables', params.id); break;
+      case 'setIncWork':   result = setIncWork(ss, params); break;
+      case 'submitIncReport': result = submitIncReport(ss, params); break;
+      case 'setConfigKey': result = setConfig(ss, params.key, params.value); break;
       default: result = { error: 'Unknown action' };
     }
     return jsonResponse(result);
@@ -197,7 +213,24 @@ function getAll(ss) {
   }));
   const config = sheetToObjects(ss.getSheetByName('config'));
   const execCode = (config.find(c => c.key === 'execCode') || {}).value || DEFAULT_EXEC_CODE;
-  return { staff, managers, clients, clientServices, entries, codes, reports, tasks, leads, attendance, execCode: String(execCode) };
+  const configMap = {}; config.forEach(c => { configMap[c.key] = c.value; });
+  // ---- Salary Increment Program ----
+  const incMembers = sheetToObjects(ss.getSheetByName('incMembers')).map(m => ({
+    ...m, joinedAt: dateCellToString(m.joinedAt, tz),
+    active: !(m.active === false || m.active === 'FALSE' || m.active === 'false')
+  }));
+  const deliverables = sheetToObjects(ss.getSheetByName('deliverables'));
+  const incWork = sheetToObjects(ss.getSheetByName('incWork')).map(w => ({
+    ...w, doneAt: dateCellToString(w.doneAt, tz),
+    done: w.done === true || w.done === 'TRUE' || w.done === 'true'
+  }));
+  const incReports = sheetToObjects(ss.getSheetByName('incReports')).map(r => ({
+    ...r, submittedAt: dateCellToString(r.submittedAt, tz),
+    onTime: r.onTime === true || r.onTime === 'TRUE' || r.onTime === 'true'
+  }));
+  return { staff, managers, clients, clientServices, entries, codes, reports, tasks, leads, attendance,
+           incMembers, deliverables, incWork, incReports,
+           config: configMap, execCode: String(execCode) };
 }
 
 // Attendance: one record per staff per day. Check-in / check-out / overtime all
@@ -572,4 +605,130 @@ function zohoExchangeGrant(){
   props.deleteProperty('ZOHO_GRANT_CODE');
   Logger.log('✅ Refresh token saved. Now run zohoTest().');
   return '✅ Refresh token saved. Now run zohoTest().';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SALARY INCREMENT PROGRAM
+//  Staff opt in, then qualify each month by hitting three bars:
+//    1. >= 95% entry compliance
+//    2. all their client deliverables ticked off
+//    3. previous month's PDF report submitted by the 5th
+// ══════════════════════════════════════════════════════════════
+
+function incJoin(ss, params) {
+  const sh = ss.getSheetByName('incMembers');
+  const headers = sheetHeaders(sh, 'incMembers');
+  const col = h => headers.indexOf(h);
+  const tz = ss.getSpreadsheetTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col('staffId')]) === String(params.staffId)) {
+      sh.getRange(i + 1, col('active') + 1).setValue(true);   // re-joining
+      return { ok: true, rejoined: true };
+    }
+  }
+  const obj = { id: 'inc' + Date.now(), staffId: params.staffId, staffName: params.staffName, joinedAt: today, active: true };
+  const r = sh.getLastRow() + 1;
+  headers.forEach((h, i) => {
+    const cell = sh.getRange(r, i + 1);
+    if (h === 'joinedAt') cell.setNumberFormat('@');
+    cell.setValue(obj[h] !== undefined ? obj[h] : '');
+  });
+  return { ok: true, joined: true };
+}
+
+function incSetActive(ss, staffId, active) {
+  const sh = ss.getSheetByName('incMembers');
+  const headers = sheetHeaders(sh, 'incMembers');
+  const col = h => headers.indexOf(h);
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col('staffId')]) === String(staffId)) {
+      sh.getRange(i + 1, col('active') + 1).setValue(active);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Not enrolled' };
+}
+
+// One row per (month, staff, client, service). Ticking is idempotent.
+function setIncWork(ss, params) {
+  const sh = ss.getSheetByName('incWork');
+  const headers = sheetHeaders(sh, 'incWork');
+  const col = h => headers.indexOf(h);
+  const tz = ss.getSpreadsheetTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const done = params.done === 'true' || params.done === true;
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col('month')]) === String(params.month) &&
+        String(data[i][col('staffId')]) === String(params.staffId) &&
+        String(data[i][col('client')]) === String(params.client) &&
+        String(data[i][col('service')]) === String(params.service)) {
+      sh.getRange(i + 1, col('done') + 1).setValue(done);
+      sh.getRange(i + 1, col('doneAt') + 1).setValue(done ? today : '');
+      if (params.note !== undefined) sh.getRange(i + 1, col('note') + 1).setValue(params.note || '');
+      return { ok: true, updated: true };
+    }
+  }
+  const obj = {
+    id: 'w' + Date.now() + Math.floor(Math.random() * 1000),
+    month: params.month, staffId: params.staffId, staffName: params.staffName,
+    client: params.client, service: params.service,
+    done: done, doneAt: done ? today : '', note: params.note || ''
+  };
+  const r = sh.getLastRow() + 1;
+  headers.forEach((h, i) => {
+    const cell = sh.getRange(r, i + 1);
+    if (h === 'month' || h === 'doneAt') cell.setNumberFormat('@');
+    cell.setValue(obj[h] !== undefined ? obj[h] : '');
+  });
+  return { ok: true, created: true };
+}
+
+// Monthly report PDF -> Drive. On time = submitted by the 5th of the month
+// AFTER the reporting month.
+function submitIncReport(ss, params) {
+  const sh = ss.getSheetByName('incReports');
+  const headers = sheetHeaders(sh, 'incReports');
+  const col = h => headers.indexOf(h);
+  const tz = ss.getSpreadsheetTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+  // deadline = 5th of the month following params.month ("2026-07" -> 2026-08-05)
+  const y = parseInt(String(params.month).slice(0, 4), 10);
+  const m = parseInt(String(params.month).slice(5, 7), 10);
+  const dl = new Date(Date.UTC(y, m, 5));           // m is 0-based next month
+  const deadline = dl.toISOString().slice(0, 10);
+  const onTime = today <= deadline;
+
+  const blob = Utilities.newBlob(Utilities.base64Decode(params.fileData), 'application/pdf',
+                                 (params.fileName || ('report_' + params.month + '.pdf')));
+  const file = uploadFolder().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  const url = 'https://drive.google.com/file/d/' + file.getId() + '/view';
+
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col('month')]) === String(params.month) &&
+        String(data[i][col('staffId')]) === String(params.staffId)) {
+      sh.getRange(i + 1, col('fileUrl') + 1).setValue(url);
+      sh.getRange(i + 1, col('fileName') + 1).setValue(params.fileName || '');
+      sh.getRange(i + 1, col('submittedAt') + 1).setValue(today);
+      sh.getRange(i + 1, col('onTime') + 1).setValue(onTime);
+      return { ok: true, updated: true, onTime: onTime, url: url };
+    }
+  }
+  const obj = {
+    id: 'rep' + Date.now(), month: params.month, staffId: params.staffId, staffName: params.staffName,
+    fileUrl: url, fileName: params.fileName || '', submittedAt: today, onTime: onTime
+  };
+  const r = sh.getLastRow() + 1;
+  headers.forEach((h, i) => {
+    const cell = sh.getRange(r, i + 1);
+    if (h === 'month' || h === 'submittedAt') cell.setNumberFormat('@');
+    cell.setValue(obj[h] !== undefined ? obj[h] : '');
+  });
+  return { ok: true, created: true, onTime: onTime, url: url };
 }

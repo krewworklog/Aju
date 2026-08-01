@@ -328,6 +328,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('my-tasks',this)"><span class="nav-ic">✅</span>My Tasks<span class="nbadge amber" id="b-mytasks">0</span></div>
         <div class="nav" onclick="gp('my-targets',this)"><span class="nav-ic">🎯</span>My Targets<span class="nbadge purple" id="b-mytargets">0</span></div>
         <div class="nav" onclick="gp('my-attendance',this)"><span class="nav-ic">🕘</span>My Attendance<span class="nbadge amber" id="b-myattn"></span></div>
+        <div class="nav" onclick="gp('my-increment',this)"><span class="nav-ic">📈</span>Increment<span class="nbadge purple" id="b-myinc"></span></div>
       </div>
       <div id="sb-manager" style="display:none">
         <div class="sbl">Dashboard</div>
@@ -343,6 +344,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="sbl">Settings</div>
         <div class="nav" onclick="gp('mgr-staff',this)"><span class="nav-ic">👥</span>Staff Accounts</div>
         <div class="nav" onclick="gp('mgr-clients',this)"><span class="nav-ic">🏢</span>Clients</div>
+        <div class="nav" onclick="gp('mgr-increment',this)"><span class="nav-ic">📈</span>Increment Program</div>
       </div>
       <div id="sb-exec" style="display:none">
         <div class="sbl">Executive</div>
@@ -352,6 +354,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
         <div class="nav" onclick="gp('exec-compliance',this)"><span class="nav-ic">🚨</span>Compliance</div>
         <div class="nav" onclick="gp('exec-salary',this)"><span class="nav-ic">💰</span>Salary</div>
+        <div class="nav" onclick="gp('exec-increment',this)"><span class="nav-ic">📈</span>Increment Program</div>
         <div class="nav" onclick="gp('exec-attendance',this)"><span class="nav-ic">🕘</span>Attendance</div>
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('exec-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-exec-tasks">0</span></div>
@@ -522,7 +525,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- EXEC: SALARY -->
       <div class="page" id="page-exec-salary">
-        <div class="ph"><div><div class="pt">Salary & Compliance</div><p class="ps">Monthly salary per staff: base × attendance (hours present ÷ expected, from Aug 2026), then −50 AED per missed entry (from Aug 2026) and −5% for a missed lead target.</p></div></div>
+        <div class="ph"><div><div class="pt">Salary & Compliance</div><p class="ps">Monthly salary per staff: base × attendance (hours present ÷ expected, from Aug 2026), then −20 AED per missed entry (from Aug 2026), −5% for a missed lead target, and + the increment for staff who qualified in the programme.</p></div></div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
           <label style="font-size:12px;color:var(--ink3)">Month</label>
           <input type="month" id="sal-month" onchange="renderExecSalary()" style="width:auto"/>
@@ -531,6 +534,16 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="sal-banner"></div>
         <div class="card"><div class="ct">Salary Calculation</div><div id="sal-table"></div></div>
         <div id="sal-leads"></div>
+      </div>
+
+      <!-- MANAGER: INCREMENT PROGRAM -->
+      <div class="page" id="page-mgr-increment">
+        <div class="ph"><div><div class="pt">Increment Program</div><p class="ps">Members, their monthly progress, and the report PDFs they have submitted.</p></div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+          <label style="font-size:12px;color:var(--ink3)">Month</label>
+          <input type="month" id="inc-mgr-month" onchange="renderIncProgram('mgr')" style="width:auto"/>
+        </div>
+        <div id="inc-mgr-wrap"></div>
       </div>
 
       <!-- EXEC: ATTENDANCE -->
@@ -542,6 +555,30 @@ textarea{resize:vertical;line-height:1.6;}
         </div>
         <div class="card"><div class="ct">Monthly summary</div><div id="attn-summary"></div></div>
         <div class="card"><div class="ct">Daily records</div><div id="attn-records"></div></div>
+      </div>
+
+      <!-- EXEC: INCREMENT PROGRAM -->
+      <div class="page" id="page-exec-increment">
+        <div class="ph"><div><div class="pt">Increment Program</div><p class="ps">Who qualifies for a raise this month, plus the client deliverables that define "monthly work".</p></div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+          <label style="font-size:12px;color:var(--ink3)">Month</label>
+          <input type="month" id="inc-exec-month" onchange="renderIncProgram('exec')" style="width:auto"/>
+          <label style="font-size:12px;color:var(--ink3);margin-left:12px">Raise %</label>
+          <input type="number" id="inc-pct" min="0" step="0.5" style="width:90px"/>
+          <button class="btn btn-ghost btn-sm" onclick="saveIncPct()">Save</button>
+        </div>
+        <div id="inc-exec-wrap"></div>
+        <div class="card" style="margin-top:1.25rem">
+          <div class="ct">Monthly deliverables (from client onboarding)</div>
+          <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">Every item here must be ticked off by a staff member each month to count as "monthly work complete".</p>
+          <div class="fg">
+            <div class="f"><label>Client</label><select id="dlv-client"></select></div>
+            <div class="f"><label>Service</label><select id="dlv-service"></select></div>
+            <div class="f"><label>Qty / month</label><input type="text" id="dlv-qty" placeholder="e.g. 12 reels"/></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="addDeliverable()">＋ Add deliverable</button>
+          <div id="dlv-list" style="margin-top:14px"></div>
+        </div>
       </div>
 
       <!-- EXEC: CODES -->
@@ -596,6 +633,12 @@ textarea{resize:vertical;line-height:1.6;}
       <div class="page" id="page-my-attendance">
         <div class="ph"><div><div class="pt">My Attendance</div><p class="ps">Check in when you start and check out when you leave. Log any overtime worked outside office hours.</p></div></div>
         <div id="my-attendance-wrap"></div>
+      </div>
+
+      <!-- STAFF: SALARY INCREMENT -->
+      <div class="page" id="page-my-increment">
+        <div class="ph"><div><div class="pt">Salary Increment Program</div><p class="ps">Join the programme, then qualify each month by hitting all three targets.</p></div></div>
+        <div id="my-inc-wrap"></div>
       </div>
 
       <!-- MANAGER: TASKS -->
@@ -766,7 +809,62 @@ function resetBackend(){
 // ════════════════════════════════════════
 //  STATE (mirror of sheet data)
 // ════════════════════════════════════════
-let DB = { staff:[], managers:[], clients:[], clientServices:{}, entries:[], codes:[], reports:[], tasks:[], leads:[], attendance:[], execCode:'99999' };
+let DB = { staff:[], managers:[], clients:[], clientServices:{}, entries:[], codes:[], reports:[], tasks:[], leads:[], attendance:[], incMembers:[], deliverables:[], incWork:[], incReports:[], execCode:'99999' };
+
+// ── Salary Increment Program ─────────────────────────────────
+// Opt-in. Each month a member qualifies by clearing three bars:
+//   1. >= 95% entry compliance   2. all client deliverables ticked
+//   3. previous month's PDF report submitted by the 5th
+const INC_COMPLIANCE_PCT=95;
+const INC_REPORT_DAY=5;
+function incRaisePct(){ const v=parseFloat(DB.config&&DB.config.incRaisePct); return isNaN(v)?5:v; }
+function incMemberFor(staffId){ return (DB.incMembers||[]).find(m=>String(m.staffId)===String(staffId)&&m.active); }
+function prevMonth(mo){ const y=+mo.slice(0,4), m=+mo.slice(5,7); const d=new Date(Date.UTC(y,m-2,1)); return d.toISOString().slice(0,7); }
+function incReportDeadline(mo){ const y=+mo.slice(0,4), m=+mo.slice(5,7); return new Date(Date.UTC(y,m,INC_REPORT_DAY)).toISOString().slice(0,10); }
+// Every deliverable owed across all clients (from the onboarding form).
+function allDeliverables(){ return (DB.deliverables||[]); }
+function incWorkFor(month,staffId){ return (DB.incWork||[]).filter(w=>String(w.month)===String(month)&&String(w.staffId)===String(staffId)); }
+function incReportFor(month,staffId){ return (DB.incReports||[]).find(r=>String(r.month)===String(month)&&String(r.staffId)===String(staffId)); }
+
+// Working days in a month up to `end` (Sundays off), from the staff join date.
+function incWorkdays(month,end,createdAt){
+  const days=[]; let cur=month+'-01';
+  while(cur<=end&&days.length<32){
+    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0 && (!createdAt||String(createdAt).slice(0,10)<=cur)) days.push(cur);
+    cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  }
+  return days;
+}
+// Entry compliance: submitted entry-slots ÷ expected slots (2 per working day).
+function incCompliance(staff,month){
+  const monthEnd=new Date(Date.UTC(+month.slice(0,4),+month.slice(5,7),0)).toISOString().slice(0,10);
+  const today=todayStr();
+  const end = today>monthEnd?monthEnd:(today.slice(0,7)===month?today:monthEnd);
+  const days=incWorkdays(month,end,staff.createdAt);
+  const expected=days.length*2;
+  let got=0;
+  days.forEach(d=>{
+    const n=DB.entries.filter(e=>String(e.staffId)===String(staff.id)&&String(e.date)===d).length;
+    got+=Math.min(2,n);
+  });
+  return { expected, got, pct: expected?Math.round(got/expected*100):100, missed: Math.max(0,expected-got) };
+}
+// Full monthly assessment for one enrolled staff member.
+function incAssess(staff,month){
+  const comp=incCompliance(staff,month);
+  const deliv=allDeliverables();
+  const work=incWorkFor(month,staff.id);
+  const doneKeys=new Set(work.filter(w=>w.done).map(w=>w.client+'||'+w.service));
+  const doneCount=deliv.filter(d=>doneKeys.has(d.client+'||'+d.service)).length;
+  // The report that counts for `month` is the PREVIOUS month's, due by the 5th.
+  const rep=incReportFor(prevMonth(month),staff.id);
+  const pass={
+    compliance: comp.pct>=INC_COMPLIANCE_PCT,
+    work: deliv.length>0 && doneCount>=deliv.length,
+    report: !!(rep&&rep.onTime)
+  };
+  return { comp, deliv, doneCount, rep, pass, qualified: pass.compliance&&pass.work&&pass.report };
+}
 
 // Services the agency offers. Onboarding ticks which ones each client pays for;
 // staff pick from a client's paid services (plus "Other") when logging work.
@@ -859,8 +957,8 @@ const LEAD_TARGETS=[
    fields:[{k:'f1',label:'Client Name *',ph:'Full name'},{k:'f2',label:'Email Address *',ph:'name@email.com'}]}
 ];
 const SALARIES={'Fathima Salahudheen':4500,'Muhammed Jasim':4500,'Vyshak Babu':3900,'Peter Noyal':3900,'Afeefa Firoz':3000};
-const ENTRY_CUT_START='2026-08'; // 50 AED per missed entry, from August 2026
-const ENTRY_CUT=50;
+const ENTRY_CUT_START='2026-08'; // 20 AED per missed entry, from August 2026
+const ENTRY_CUT=20;
 const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead target
 
 const SALES_STATUSES=['Contacted','Approved','Denied','No response'];
@@ -1038,6 +1136,9 @@ function gp(id,el){
     'exec-compliance':renderExecCompliance,
     'exec-salary':renderExecSalary,
     'exec-attendance':renderExecAttendance,
+    'my-increment':renderMyIncrement,
+    'mgr-increment':()=>renderIncProgram('mgr'),
+    'exec-increment':()=>renderIncProgram('exec'),
     'my-targets':renderMyTargets,
     'my-attendance':renderMyAttendance,
     'mgr-staff':renderStaffTable,
@@ -1625,6 +1726,178 @@ async function saveLeadSales(id){
 }
 
 // ════════════════════════════════════════
+//  SALARY INCREMENT PROGRAM
+// ════════════════════════════════════════
+function incBar(pct,ok){
+  const w=Math.min(100,Math.max(0,pct));
+  return `<div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin:6px 0"><div style="height:100%;width:${w}%;background:${ok?'var(--green)':'var(--amber)'};border-radius:99px"></div></div>`;
+}
+function incCheck(ok,label,detail){
+  return `<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)">
+    <span style="font-size:17px;flex-shrink:0">${ok?'✅':'⬜️'}</span>
+    <div style="flex:1"><div style="font-size:13px;font-weight:600;color:${ok?'var(--green)':'var(--ink)'}">${label}</div>
+    <div style="font-size:12px;color:var(--ink3);margin-top:2px">${detail}</div></div></div>`;
+}
+
+// ---- STAFF ----
+function renderMyIncrement(){
+  const el=document.getElementById('my-inc-wrap'); if(!el) return;
+  const me=DB.staff.find(s=>String(s.id)===String(session.user.id))||{id:session.user.id,name:session.user.name};
+  const member=incMemberFor(session.user.id);
+  const month=todayStr().slice(0,7);
+  if(!member){
+    el.innerHTML=`<div class="card" style="text-align:center;padding:2.5rem 1.5rem">
+      <div style="font-size:40px;margin-bottom:10px">📈</div>
+      <div class="ct" style="font-size:15px;text-transform:none;letter-spacing:0">Join the Salary Increment Program</div>
+      <p style="font-size:13px;color:var(--ink2);max-width:520px;margin:8px auto 18px;line-height:1.7">
+        Qualify each month and earn a <strong>${incRaisePct()}% salary increase</strong>. To qualify you must:
+      </p>
+      <div style="max-width:430px;margin:0 auto;text-align:left">
+        ${incCheck(false,`${INC_COMPLIANCE_PCT}% entry compliance`,'Submit both daily entries on time.')}
+        ${incCheck(false,'Complete your monthly client work','Every service promised to each client, delivered and ticked off.')}
+        ${incCheck(false,`Submit your monthly report by the ${INC_REPORT_DAY}th`,'Upload a PDF covering the previous month.')}
+      </div>
+      <button class="btn btn-primary" style="margin-top:20px;padding:11px 30px" onclick="incJoin()">Join the programme</button>
+    </div>`;
+    return;
+  }
+  const a=incAssess(me,month);
+  const repMonth=prevMonth(month);
+  const repDue=incReportDeadline(repMonth);
+  const rep=incReportFor(repMonth,me.id);
+  const deliv=a.deliv;
+  const work=incWorkFor(month,me.id);
+  const doneKeys=new Set(work.filter(w=>w.done).map(w=>w.client+'||'+w.service));
+  el.innerHTML=`
+    <div class="card" style="margin-bottom:1rem;${a.qualified?'border-color:rgba(34,197,94,.5)':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="ct" style="margin-bottom:0">${month} progress</div>
+        <span class="tag ${a.qualified?'t-ok':'t-pu'}" style="font-size:13px">${a.qualified?`✅ Qualified — +${incRaisePct()}%`:'In progress'}</span>
+      </div>
+      <div style="margin-top:12px">
+        ${incCheck(a.pass.compliance,`Entry compliance — ${a.comp.pct}% (need ${INC_COMPLIANCE_PCT}%)`,`${a.comp.got} of ${a.comp.expected} entries submitted${a.comp.missed?` · ${a.comp.missed} missed`:''}`)}
+        ${incBar(a.comp.pct,a.pass.compliance)}
+        ${incCheck(a.pass.work,`Monthly client work — ${a.doneCount} of ${deliv.length} delivered`,deliv.length?'Tick each item below as you deliver it.':'No deliverables set up yet — ask the executive to add them.')}
+        ${deliv.length?incBar(Math.round(a.doneCount/deliv.length*100),a.pass.work):''}
+        ${incCheck(a.pass.report,`${repMonth} report submitted by the ${INC_REPORT_DAY}th`,rep?(rep.onTime?`Submitted ${rep.submittedAt} ✓`:`Submitted ${rep.submittedAt} — after the ${repDue} deadline`):`Not submitted — due ${repDue}`)}
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1rem">
+      <div class="ct">Monthly report — ${repMonth}</div>
+      <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">Upload a PDF of your ${repMonth} report. Deadline: <strong>${repDue}</strong>. Your manager and the executive can open it.</p>
+      ${rep?`<div class="banner ${rep.onTime?'b-ok':'b-am'}" style="margin-bottom:10px"><span>${rep.onTime?'✅':'⚠'}</span><span>Submitted ${rep.submittedAt}${rep.onTime?' (on time)':' (late)'} — <a href="${encodeURI(rep.fileUrl)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">open PDF</a></span></div>`:''}
+      <div class="f"><label>PDF file</label><input type="file" id="inc-pdf" accept="application/pdf"/></div>
+      <button class="btn btn-primary btn-sm" onclick="submitIncReport('${repMonth}')">${rep?'Replace report':'Submit report'}</button>
+    </div>
+
+    <div class="card">
+      <div class="ct">Client deliverables — ${month}</div>
+      ${deliv.length?`<div>${deliv.map(d=>{
+        const key=d.client+'||'+d.service, done=doneKeys.has(key);
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <input type="checkbox" ${done?'checked':''} style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;flex-shrink:0" onchange="tickDeliverable('${month}','${escapeHtml(d.client)}','${escapeHtml(d.service)}',this.checked)"/>
+          <div style="flex:1"><div style="font-size:13px;font-weight:600${done?';color:var(--green)':''}">${escapeHtml(d.client)}</div>
+          <div style="font-size:12px;color:var(--ink3)">${escapeHtml(d.service)}${d.qty?' · '+escapeHtml(String(d.qty)):''}</div></div>
+          <span class="tag ${done?'t-ok':'t-pu'}">${done?'✓ Delivered':'Pending'}</span>
+        </div>`;}).join('')}</div>`
+      :'<p style="font-size:13px;color:var(--ink3)">No deliverables defined yet.</p>'}
+      <div style="margin-top:14px;font-size:12px;color:var(--ink3)">Leaving the programme? <a href="#" onclick="incLeave();return false" style="color:var(--red)">Opt out</a></div>
+    </div>`;
+}
+async function incJoin(){
+  try{ await api('incJoin',{staffId:session.user.id,staffName:session.user.name}); await syncAll(); renderMyIncrement(); toast('You have joined the programme 🎉','ok'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+}
+async function incLeave(){
+  if(!confirm('Opt out of the increment programme? You can re-join later.'))return;
+  try{ await api('incLeave',{staffId:session.user.id}); await syncAll(); renderMyIncrement(); toast('You have opted out.'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+}
+async function tickDeliverable(month,client,service,done){
+  try{ await api('setIncWork',{month,staffId:session.user.id,staffName:session.user.name,client,service,done}); await syncAll(); renderMyIncrement(); }
+  catch(e){ toast('Failed: '+e.message,'err'); await syncAll(); renderMyIncrement(); }
+}
+async function submitIncReport(month){
+  const f=(document.getElementById('inc-pdf').files||[])[0];
+  if(!f){ toast('Choose a PDF file first.','err'); return; }
+  if(f.type!=='application/pdf'){ toast('The report must be a PDF.','err'); return; }
+  if(f.size>8*1024*1024){ toast('PDF is too large (max 8 MB).','err'); return; }
+  try{
+    const b64=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(f); });
+    const out=await apiPost('submitIncReport',{month,staffId:session.user.id,staffName:session.user.name,fileData:b64,fileName:f.name});
+    await syncAll(); renderMyIncrement();
+    toast(out.onTime?'Report submitted on time ✅':'Report submitted (after the deadline)', out.onTime?'ok':'err');
+  }catch(e){ toast('Upload failed: '+e.message,'err'); }
+}
+
+// ---- MANAGER / EXECUTIVE ----
+function renderIncProgram(who){
+  const isExec = who==='exec';
+  const mEl=document.getElementById(isExec?'inc-exec-month':'inc-mgr-month');
+  if(mEl && !mEl.value) mEl.value=todayStr().slice(0,7);
+  const month=(mEl&&mEl.value)||todayStr().slice(0,7);
+  const wrap=document.getElementById(isExec?'inc-exec-wrap':'inc-mgr-wrap');
+  if(!wrap) return;
+  if(isExec){ const p=document.getElementById('inc-pct'); if(p&&!p.value) p.value=incRaisePct(); renderDeliverables(); }
+  const members=(DB.incMembers||[]).filter(m=>m.active);
+  const repMonth=prevMonth(month);
+  if(!members.length){ wrap.innerHTML=emptyState('📈','No staff have joined the programme yet.'); return; }
+  const rows=members.map(m=>{
+    const st=DB.staff.find(s=>String(s.id)===String(m.staffId))||{id:m.staffId,name:m.staffName};
+    return { m, st, a:incAssess(st,month), rep:incReportFor(repMonth,m.staffId) };
+  });
+  const qualified=rows.filter(r=>r.a.qualified).length;
+  wrap.innerHTML=`
+    <div class="sg">
+      <div class="sc"><div class="sl">Members</div><div class="sv sv-ac">${members.length}</div></div>
+      <div class="sc"><div class="sl">Qualified</div><div class="sv sv-gr">${qualified}</div><div class="ss">${month}</div></div>
+      <div class="sc"><div class="sl">Reports in</div><div class="sv">${rows.filter(r=>r.rep).length} / ${members.length}</div><div class="ss">${repMonth}</div></div>
+      ${isExec?`<div class="sc"><div class="sl">Raise if qualified</div><div class="sv sv-te">${incRaisePct()}%</div></div>`:''}
+    </div>
+    <div class="card"><div class="ct">Members — ${month}</div>
+      <table class="stbl"><thead><tr><th>Staff</th><th>Compliance</th><th>Monthly work</th><th>Report (${repMonth})</th><th>Status</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr>
+        <td style="font-family:var(--font);font-weight:800">${escapeHtml(r.st.name)}</td>
+        <td><span class="tag ${r.a.pass.compliance?'t-ok':'t-late'}">${r.a.comp.pct}%</span> <span style="font-size:11px;color:var(--ink3)">${r.a.comp.got}/${r.a.comp.expected}</span></td>
+        <td><span class="tag ${r.a.pass.work?'t-ok':'t-pu'}">${r.a.doneCount}/${r.a.deliv.length}</span></td>
+        <td>${r.rep?`<a href="${encodeURI(r.rep.fileUrl)}" target="_blank" rel="noopener" class="tag ${r.rep.onTime?'t-ok':'t-late'}">📄 ${r.rep.onTime?'On time':'Late'}</a> <span style="font-size:11px;color:var(--ink3)">${r.rep.submittedAt}</span>`:`<span class="tag t-late">Not submitted</span>`}</td>
+        <td>${r.a.qualified?`<span class="tag t-ok">✅ Qualified${isExec?` +${incRaisePct()}%`:''}</span>`:'<span class="tag t-pu">Not yet</span>'}</td>
+      </tr>`).join('')}
+      </tbody></table>
+      <p style="font-size:11px;color:var(--ink3);margin-top:10px">Qualifies with ${INC_COMPLIANCE_PCT}%+ compliance, all deliverables ticked, and the ${repMonth} report submitted by ${incReportDeadline(repMonth)}.</p>
+    </div>`;
+}
+function renderDeliverables(){
+  const cSel=document.getElementById('dlv-client'), sSel=document.getElementById('dlv-service');
+  if(cSel){ const prev=cSel.value; cSel.innerHTML=DB.clients.map(c=>`<option>${escapeHtml(c)}</option>`).join(''); if(prev)cSel.value=prev; }
+  if(sSel){ const prev=sSel.value; sSel.innerHTML=SERVICES.map(s=>`<option>${escapeHtml(s)}</option>`).join(''); if(prev)sSel.value=prev; }
+  const el=document.getElementById('dlv-list'); if(!el) return;
+  const d=allDeliverables();
+  el.innerHTML=d.length?`<table class="stbl"><thead><tr><th>Client</th><th>Service</th><th>Qty / month</th><th></th></tr></thead><tbody>
+    ${d.map(x=>`<tr><td>${escapeHtml(x.client)}</td><td>${escapeHtml(x.service)}</td><td style="color:var(--ink3)">${escapeHtml(String(x.qty||''))}</td><td><button class="btn btn-danger btn-xs" onclick="deleteDeliverable('${x.id}')">✕</button></td></tr>`).join('')}
+  </tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No deliverables yet. Add what each client is owed every month.</p>';
+}
+async function addDeliverable(){
+  const client=document.getElementById('dlv-client').value, service=document.getElementById('dlv-service').value, qty=document.getElementById('dlv-qty').value.trim();
+  if(!client||!service){ toast('Pick a client and a service.','err'); return; }
+  if(allDeliverables().some(d=>d.client===client&&d.service===service)){ toast('That client already has this service listed.','err'); return; }
+  try{ await api('addDeliverable',{data:{id:'d'+Date.now(),client,service,qty,note:''}}); await syncAll(); renderIncProgram('exec'); toast('Deliverable added.','ok'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+}
+async function deleteDeliverable(id){
+  if(!confirm('Remove this deliverable?'))return;
+  try{ await api('deleteDeliverable',{id}); await syncAll(); renderIncProgram('exec'); toast('Removed.'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+}
+async function saveIncPct(){
+  const v=document.getElementById('inc-pct').value;
+  if(v===''||+v<0){ toast('Enter a valid percentage.','err'); return; }
+  try{ await api('setConfigKey',{key:'incRaisePct',value:v}); await syncAll(); renderIncProgram('exec'); toast('Raise percentage saved.','ok'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+}
+
+// ════════════════════════════════════════
 //  EXEC: SALARY & COMPLIANCE
 // ════════════════════════════════════════
 function renderExecSalary(){
@@ -1648,7 +1921,7 @@ function renderExecSalary(){
   const banner=document.getElementById('sal-banner');
   let notes=[];
   if(!attnActive)notes.push('Attendance-based pay applies from August 2026 — for this month full base pay is used regardless of hours.');
-  if(!cutsActive)notes.push('Entry deductions (50 AED each) apply from August 2026 — this month shows missed counts only, with no entry cut.');
+  if(!cutsActive)notes.push('Entry deductions (20 AED each) apply from August 2026 — this month shows missed counts only, with no entry cut.');
   if(!monthOver)notes.push(`Month still in progress — the ${TARGET_CUT_PCT}% target cut only applies if the goal is still unmet at month end.`);
   banner.innerHTML=notes.length?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>ℹ️</span><span>${notes.join(' ')}</span></div>`:'';
   const rows=DB.staff.map(s=>{
@@ -1671,13 +1944,18 @@ function renderExecSalary(){
       if(!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
       return `<span class="tag ${done?'t-ok':(monthOver?'t-late':'t-pu')}">${t.icon} ${ok}/${t.goal}${done?' ✓':(monthOver?' ✗':'')}</span>`;
     }).join(' '):'<span style="color:var(--ink3)">—</span>';
-    const finalPay=base!=null?attPay-entryCut-targetCut:null;
-    return {s,base,att,attFactor,attPay,missedSlots,entryCut,targetHtml,targetCut,finalPay};
+    // Salary Increment Program: qualified members earn a % raise this month.
+    const enrolled=!!incMemberFor(s.id);
+    const assess=enrolled?incAssess(s,month):null;
+    const incQualified=!!(assess&&assess.qualified);
+    const incAmount=(incQualified&&base!=null)?Math.round(base*incRaisePct()/100):0;
+    const finalPay=base!=null?attPay-entryCut-targetCut+incAmount:null;
+    return {s,base,att,attFactor,attPay,missedSlots,entryCut,targetHtml,targetCut,enrolled,assess,incQualified,incAmount,finalPay};
   });
   const totBase=rows.reduce((a,r)=>a+(r.base||0),0);
   const totFinal=rows.reduce((a,r)=>a+(r.finalPay||0),0);
   document.getElementById('sal-table').innerHTML=`
-    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Final (AED)</th></tr></thead><tbody>
+    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Increment</th><th>Final (AED)</th></tr></thead><tbody>
     ${rows.map(r=>{
       const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
       return `<tr>
@@ -1689,11 +1967,12 @@ function renderExecSalary(){
       <td style="color:${r.entryCut?'var(--red)':'var(--ink3)'}">${r.entryCut?'−'+r.entryCut.toLocaleString():'0'}</td>
       <td>${r.targetHtml}</td>
       <td style="color:${r.targetCut?'var(--red)':'var(--ink3)'}">${r.targetCut?'−'+r.targetCut.toLocaleString():'0'}</td>
+      <td>${!r.enrolled?'<span style="color:var(--ink3)">—</span>':(r.incQualified?`<span class="tag t-ok">+${r.incAmount.toLocaleString()}</span>`:'<span class="tag t-pu">not met</span>')}</td>
       <td style="font-family:var(--font);font-weight:800;color:${r.finalPay!=null&&r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay!=null?r.finalPay.toLocaleString():'—'}</td>
     </tr>`;}).join('')}
-    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
+    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Attendance pay = base × (hours present ÷ expected). Missed entries: each of the 2 daily slots counts once.</p>`;
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Attendance pay = base × (hours present ÷ expected). Missed entries: each of the 2 daily slots counts once, at ${ENTRY_CUT} AED. Increment = +${incRaisePct()}% for enrolled staff who met all three programme targets.</p>`;
   document.getElementById('sal-leads').innerHTML=LEAD_TARGETS.map(t=>{
     const leads=leadsForTarget(t.id,month);
     const ok=leads.length;
@@ -2062,6 +2341,13 @@ function updateBadges(){
   }
   const bgMT=document.getElementById('b-mgr-tasks');if(bgMT)bgMT.textContent=myAssigned;
   const beMT=document.getElementById('b-exec-tasks');if(beMT)beMT.textContent=myAssigned;
+  // Increment badge: enrolled and not yet qualified this month.
+  const bInc=document.getElementById('b-myinc');
+  if(bInc&&session.user&&session.role==='staff'){
+    const me=DB.staff.find(x=>String(x.id)===String(session.user.id));
+    const mem=incMemberFor(session.user.id);
+    bInc.textContent = (mem&&me&&!incAssess(me,todayStr().slice(0,7)).qualified) ? '●' : '';
+  }
   // Attendance reminder dot: working day and not yet checked out.
   const bAt=document.getElementById('b-myattn');
   if(bAt&&session.user&&session.role==='staff'){
