@@ -270,16 +270,22 @@ function attnUpsert(ss, params) {
   return { ok: true, created: true };
 }
 
+// Columns that must stay literal text — Sheets would otherwise turn values
+// like "3-4" into a date, or strip leading zeros.
+const TEXT_COLS = { qty: 1, month: 1, date: 1, chequeNo: 1, joinedAt: 1, doneAt: 1, submittedAt: 1 };
+
 function addRow(ss, sheetName, obj) {
   const sh = ss.getSheetByName(sheetName);
   const headers = sheetHeaders(sh, sheetName);
-  const row = headers.map(h => {
+  const r = sh.getLastRow() + 1;
+  headers.forEach((h, i) => {
     let v = obj[h];
     if ((h === 'rows' || h === 'breakdown') && (Array.isArray(v) || typeof v === 'object')) v = JSON.stringify(v);
     if (v === undefined || v === null) v = '';
-    return v;
+    const cell = sh.getRange(r, i + 1);
+    if (TEXT_COLS[h]) cell.setNumberFormat('@');
+    cell.setValue(v);
   });
-  sh.appendRow(row);
   return { ok: true };
 }
 

@@ -872,7 +872,8 @@ function incAssess(staff,month){
 
 // Services the agency offers. Onboarding ticks which ones each client pays for;
 // staff pick from a client's paid services (plus "Other") when logging work.
-const SERVICES=['Social Media Management','SEO','Website Management','Website Development','Content Creation','Paid Ads (Meta/Google)','Branding & Design','Photography & Videography','Email Marketing'];
+// Taken from the client onboarding sheet.
+const SERVICES=['Insta & Facebook','Snapchat','TikTok','Performance Marketing','Website Creation','SEO','YouTube','Branding','GMB','Influencer Marketing','Production','Website Management','Content Creation','Model Required','LinkedIn'];
 function clientServicesFor(name){return (DB.clientServices&&DB.clientServices[name])||[];}
 
 // ── Attendance / HR ──────────────────────────────────────────
