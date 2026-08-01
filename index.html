@@ -468,11 +468,8 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- MANAGER: CLIENTS -->
       <div class="page" id="page-mgr-clients">
-        <div class="ph"><div><div class="pt">Manage Clients</div><p class="ps">Add or remove clients.</p></div></div>
-        <div class="card"><div class="ct">Client List</div>
-          <ul class="cmgr-list" id="client-list"></ul>
-          <div class="add-row"><input type="text" id="new-client" placeholder="New client name..." onkeydown="if(event.key==='Enter')addClient()"/><button class="btn btn-ghost" onclick="addClient()">＋ Add</button></div>
-        </div>
+        <div class="ph"><div><div class="pt">Client Onboarding</div><p class="ps">Add each client and tick the services they are paying for. Staff pick from these when logging work.</p></div></div>
+        <div id="mgr-clients-onboard"></div>
       </div>
 
       <!-- EXEC: OVERVIEW -->
@@ -571,11 +568,8 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- EXEC: CLIENTS MANAGEMENT -->
       <div class="page" id="page-exec-clients-mgmt">
-        <div class="ph"><div><div class="pt">Manage Clients</div><p class="ps">Add or remove clients.</p></div></div>
-        <div class="card"><div class="ct">Client List</div>
-          <ul class="cmgr-list" id="exec-client-list"></ul>
-          <div class="add-row"><input type="text" id="exec-new-client" placeholder="New client name..." onkeydown="if(event.key==='Enter')addClientExec()"/><button class="btn btn-ghost" onclick="addClientExec()">＋ Add</button></div>
-        </div>
+        <div class="ph"><div><div class="pt">Client Onboarding</div><p class="ps">Add each client and tick the services they are paying for. Staff pick from these when logging work.</p></div></div>
+        <div id="exec-clients-onboard"></div>
       </div>
 
       <!-- EXEC: PASSWORD -->
@@ -772,7 +766,12 @@ function resetBackend(){
 // ════════════════════════════════════════
 //  STATE (mirror of sheet data)
 // ════════════════════════════════════════
-let DB = { staff:[], managers:[], clients:[], entries:[], codes:[], reports:[], tasks:[], leads:[], attendance:[], execCode:'99999' };
+let DB = { staff:[], managers:[], clients:[], clientServices:{}, entries:[], codes:[], reports:[], tasks:[], leads:[], attendance:[], execCode:'99999' };
+
+// Services the agency offers. Onboarding ticks which ones each client pays for;
+// staff pick from a client's paid services (plus "Other") when logging work.
+const SERVICES=['Social Media Management','SEO','Website Management','Website Development','Content Creation','Paid Ads (Meta/Google)','Branding & Design','Photography & Videography','Email Marketing'];
+function clientServicesFor(name){return (DB.clientServices&&DB.clientServices[name])||[];}
 
 // ── Attendance / HR ──────────────────────────────────────────
 // Office hours: Mon–Fri 10:00–19:00 (9h), Sat 10:00–16:30 (6.5h), Sun off.
@@ -1042,7 +1041,7 @@ function gp(id,el){
     'my-targets':renderMyTargets,
     'my-attendance':renderMyAttendance,
     'mgr-staff':renderStaffTable,
-    'mgr-clients':renderClientList,
+    'mgr-clients':()=>renderClientsOnboarding('mgr-clients-onboard'),
     'mgr-codes':renderMgrCodesPage,
     'my-logs':renderMyLogs,
     'my-tasks':renderMyTasks,
@@ -1055,7 +1054,7 @@ function gp(id,el){
     'exec-codes':renderExecCodesPage,
     'exec-managers':renderManagerTable,
     'exec-reports':renderExecReports,
-    'exec-clients-mgmt':renderExecClientsMgmt,
+    'exec-clients-mgmt':()=>renderClientsOnboarding('exec-clients-onboard'),
   };
   if(r[id])r[id]();
 }
@@ -1114,6 +1113,12 @@ function buildClientOpts(sel,val){
   sel.innerHTML='<option value="">— Select client —</option>';
   DB.clients.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;if(c===val)o.selected=true;sel.appendChild(o);});
 }
+// Service dropdown = the client's paid services + "Other" (for unpaid work).
+function buildServiceOpts(sel,clientName,val){
+  sel.innerHTML='<option value="">— Select service —</option>';
+  clientServicesFor(clientName).forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;if(s===val)o.selected=true;sel.appendChild(o);});
+  const o=document.createElement('option');o.value='Other';o.textContent='Other — not a paid service (explain in tasks)';if(val==='Other')o.selected=true;sel.appendChild(o);
+}
 function addCE(data){
   ceCount++;
   const rowId='ce-'+Date.now()+ceCount;
@@ -1122,12 +1127,16 @@ function addCE(data){
   div.innerHTML=`<div class="ce-hdr"><span class="ce-num">Entry #${ceCount}</span>${ceCount>1?`<button class="btn btn-danger btn-xs" onclick="document.getElementById('${rowId}').remove()">✕ Remove</button>`:''}</div>
     <div class="ce-grid">
       <div class="f"><label>Client *</label><select class="cr-cl"></select></div>
+      <div class="f"><label>Service *</label><select class="cr-svc"></select></div>
       <div class="f"><label>Hours *</label><input type="number" class="cr-hr" min="0.5" max="24" step="0.5" placeholder="e.g. 4"/></div>
       <div class="f full"><label>Tasks Completed *</label><textarea class="cr-tk" placeholder="Describe what you worked on..." style="min-height:70px"></textarea></div>
       <div class="f full"><label>Proof Screenshot (PNG) *</label><input type="file" class="cr-proof" accept="image/png"/><div class="cr-proof-note" style="font-size:12px;color:var(--ink3);margin-top:4px"></div></div>
     </div>`;
   document.getElementById('ce-wrap').appendChild(div);
-  buildClientOpts(div.querySelector('.cr-cl'),data?data.client:'');
+  const clSel=div.querySelector('.cr-cl'),svSel=div.querySelector('.cr-svc');
+  buildClientOpts(clSel,data?data.client:'');
+  buildServiceOpts(svSel,data?data.client:'',data?data.service:'');
+  clSel.addEventListener('change',()=>buildServiceOpts(svSel,clSel.value));
   if(data){
     div.querySelector('.cr-hr').value=data.hours;div.querySelector('.cr-tk').value=data.tasks;
     if(data.proofImg){
@@ -1139,6 +1148,7 @@ function addCE(data){
 function getCERows(){
   return Array.from(document.querySelectorAll('.ce-row')).map(row=>({
     client:row.querySelector('.cr-cl').value,
+    service:row.querySelector('.cr-svc').value,
     hours:parseFloat(row.querySelector('.cr-hr').value)||0,
     tasks:row.querySelector('.cr-tk').value.trim(),
     proofImg:row.dataset.proofUrl||'',
@@ -1152,7 +1162,7 @@ async function collectRowsAndProofs(){
   const rows=[],proofs=[];
   for(let i=0;i<raw.length;i++){
     const r=raw[i];
-    const row={client:r.client,hours:r.hours,tasks:r.tasks};
+    const row={client:r.client,service:r.service,hours:r.hours,tasks:r.tasks};
     if(r.proofImg)row.proofImg=r.proofImg;
     if(r._file){
       if(r._file.type!=='image/png')throw new Error(`Entry #${i+1}: proof must be a PNG image.`);
@@ -1172,6 +1182,7 @@ async function submitLog(){
   for(let i=0;i<rawRows.length;i++){
     const r=rawRows[i];
     if(!r.client){toast('Select a client for each entry.','err');return;}
+    if(!r.service){toast(`Entry #${i+1}: choose a service (or "Other").`,'err');return;}
     if(!r.hours||r.hours<=0){toast('Enter hours for each entry.','err');return;}
     if(!r.tasks){toast('Enter tasks for each entry.','err');return;}
     if(!r._file&&!r.proofImg){toast(`Entry #${i+1}: upload a PNG proof screenshot of the work done.`,'err');return;}
@@ -1262,7 +1273,7 @@ function entryCard(e,isOwner){
       </div>
     </div>
     <div class="ec-meta"><span>📅 ${e.date}</span><span>🕐 ${e.submittedAt}</span>${e.deadline?`<span>⏳ Due ${e.deadline}</span>`:''}<span>⏱ ${totH.toFixed(1)}h</span>${codeIssuerLabel?`<span>🎟 By ${codeIssuerLabel}</span>`:''}</div>
-    <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span></div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div>${r.proofImg?proofThumbHtml(r.proofImg):''}</div>`).join('')}</div>
+    <div class="ec-rows">${(e.rows||[]).map(r=>`<div class="ecr"><div class="ecr-cl"><span class="tag t-cl">${r.client}</span>${r.service?`<span class="tag ${r.service==='Other'?'t-late':'t-pu'}" style="margin-left:4px">${escapeHtml(r.service)}</span>`:''}</div><div class="ecr-tasks" style="margin-top:6px">${r.tasks}</div><div class="ecr-h">⏱ ${r.hours}h</div>${r.proofImg?proofThumbHtml(r.proofImg):''}</div>`).join('')}</div>
     ${e.gnotes?`<div class="ec-notes">💬 ${e.gnotes}</div>`:''}
     ${e.late&&e.reason?`<div class="ec-reason">📋 ${e.reason}</div>`:''}
     ${canEdit?`<div class="ec-acts"><button class="btn btn-ghost btn-sm" onclick="editEntry('${e.id}')">✏ Edit</button><button class="btn btn-danger btn-sm" onclick="deleteEntry('${e.id}')">✕ Delete</button></div>`:''}
@@ -1787,22 +1798,60 @@ function closeModal(id){
   }
 }
 
-function renderClientList(){
-  document.getElementById('client-list').innerHTML=DB.clients.map(c=>`<li class="cmgr-item"><span>${c}</span><button class="del-ic" onclick="removeClient('${c}')">✕</button></li>`).join('');
+// ════════════════════════════════════════
+//  CLIENT ONBOARDING (services per client)
+// ════════════════════════════════════════
+function svcChecks(paid){
+  return `<div style="display:flex;flex-wrap:wrap">${SERVICES.map(s=>`<label style="display:inline-flex;align-items:center;gap:6px;margin:0 14px 8px 0;font-size:13px;cursor:pointer"><input type="checkbox" value="${escapeHtml(s)}" ${paid.includes(s)?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)">${escapeHtml(s)}</label>`).join('')}</div>`;
 }
-async function addClient(){
-  const v=document.getElementById('new-client').value.trim();
-  if(!v)return;
-  try {
-    const res=await api('addClient',{name:v});
+function readSvc(el){return Array.from(el.querySelectorAll('input[type=checkbox]:checked')).map(c=>c.value);}
+function renderClientsOnboarding(containerId){
+  const el=document.getElementById(containerId);if(!el)return;
+  const clients=DB.clients||[];
+  el.innerHTML=`
+    <div class="card"><div class="ct">➕ Onboard a new client</div>
+      <div class="f"><label>Client name *</label><input type="text" id="${containerId}-newname" placeholder="e.g. Flovia Flowers"/></div>
+      <label style="display:block;font-size:13px;color:var(--ink2);margin:10px 0 6px">Services they are paying for</label>
+      <div id="${containerId}-newsvc">${svcChecks([])}</div>
+      <button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="onboardClient('${containerId}')">＋ Add client</button>
+    </div>
+    ${clients.length?clients.map((c,i)=>{
+      const cardId=`conb-${containerId}-${i}`;
+      const paid=clientServicesFor(c);
+      return `<div class="card" id="${cardId}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <div class="ct" style="margin-bottom:0">🏢 ${escapeHtml(c)}</div>
+          <button class="btn btn-danger btn-xs" onclick="removeClientOnboard(${i},'${containerId}')">✕ Remove</button>
+        </div>
+        <div style="margin:10px 0" id="${cardId}-svc">${svcChecks(paid)}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-bottom:8px">${paid.length?'Paying for: '+paid.map(escapeHtml).join(', '):'No paid services yet — staff will only see “Other”.'}</div>
+        <button class="btn btn-ghost btn-sm" onclick="saveClientServices(${i},'${containerId}','${cardId}-svc')">💾 Save services</button>
+      </div>`;
+    }).join(''):emptyState('🏢','No clients yet. Onboard your first above.')}
+  `;
+}
+async function onboardClient(containerId){
+  const name=document.getElementById(containerId+'-newname').value.trim();
+  if(!name){toast('Enter a client name.','err');return;}
+  const svc=readSvc(document.getElementById(containerId+'-newsvc'));
+  try{
+    const res=await api('addClient',{name,services:svc});
     if(!res.ok){toast(res.error==='exists'?'Client already exists.':'Add failed.','err');return;}
-    document.getElementById('new-client').value='';
-    await syncAll();renderClientList();toast(`"${v}" added.`,'ok');
-  } catch(e){toast('Failed: '+e.message,'err');}
+    await syncAll();renderClientsOnboarding(containerId);toast(`"${name}" onboarded.`,'ok');
+  }catch(e){toast('Failed: '+e.message,'err');}
 }
-async function removeClient(name){
+async function saveClientServices(i,containerId,svcElId){
+  const name=(DB.clients||[])[i];if(!name)return;
+  const svc=readSvc(document.getElementById(svcElId));
+  try{
+    await api('setClientServices',{name,services:svc});
+    await syncAll();renderClientsOnboarding(containerId);toast('Services updated.','ok');
+  }catch(e){toast('Failed: '+e.message,'err');}
+}
+async function removeClientOnboard(i,containerId){
+  const name=(DB.clients||[])[i];if(!name)return;
   if(!confirm(`Remove "${name}"?`))return;
-  try {await api('deleteClient',{name});await syncAll();renderClientList();toast('Client removed.');}
+  try{await api('deleteClient',{name});await syncAll();renderClientsOnboarding(containerId);toast('Client removed.');}
   catch(e){toast('Failed: '+e.message,'err');}
 }
 
@@ -1960,11 +2009,11 @@ function renderExecStaff(){
 
 function exportCSV(){
   if(!DB.entries.length){toast('Nothing to export.','err');return;}
-  const rows=[['Staff','Username','Date','Time','Client','Hours','Tasks','Notes','Status','Reason','Code','Issued By','Proof']];
+  const rows=[['Staff','Username','Date','Time','Client','Service','Hours','Tasks','Notes','Status','Reason','Code','Issued By','Proof']];
   DB.entries.forEach(e=>{
     const code=e.usedCodeId?DB.codes.find(c=>String(c.id)===String(e.usedCodeId)):null;
     (e.rows||[]).forEach(r=>{
-      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${code?code.code:''}"`,`"${code?(code.issuedByRole==='exec'?'Executive':code.issuedByName):''}"`,`"${r.proofImg||''}"`]);
+      rows.push([`"${e.staffName}"`,`"${e.staffId}"`,`"${e.date}"`,`"${e.submittedAt}"`,`"${r.client}"`,`"${r.service||''}"`,r.hours,`"${(r.tasks||'').replace(/"/g,'""')}"`,`"${(e.gnotes||'').replace(/"/g,'""')}"`,e.late?'Late':'On Time',`"${(e.reason||'').replace(/"/g,'""')}"`,`"${code?code.code:''}"`,`"${code?(code.issuedByRole==='exec'?'Executive':code.issuedByName):''}"`,`"${r.proofImg||''}"`]);
     });
   });
   const csv=rows.map(r=>r.join(',')).join('\n');
@@ -2239,24 +2288,6 @@ async function deleteReport(id){
   catch(e){toast('Delete failed: '+e.message,'err');}
 }
 
-function renderExecClientsMgmt(){
-  document.getElementById('exec-client-list').innerHTML=DB.clients.map(c=>`<li class="cmgr-item"><span>${c}</span><button class="del-ic" onclick="removeClientExec('${c}')">✕</button></li>`).join('');
-}
-async function addClientExec(){
-  const v=document.getElementById('exec-new-client').value.trim();
-  if(!v)return;
-  try {
-    const res=await api('addClient',{name:v});
-    if(!res.ok){toast(res.error==='exists'?'Client already exists.':'Add failed.','err');return;}
-    document.getElementById('exec-new-client').value='';
-    await syncAll();renderExecClientsMgmt();toast(`"${v}" added.`,'ok');
-  } catch(e){toast('Failed: '+e.message,'err');}
-}
-async function removeClientExec(name){
-  if(!confirm(`Remove "${name}"?`))return;
-  try {await api('deleteClient',{name});await syncAll();renderExecClientsMgmt();toast('Client removed.');}
-  catch(e){toast('Failed: '+e.message,'err');}
-}
 function emptyState(icon,msg){return`<div style="text-align:center;padding:4rem 2rem;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">${icon}</div><p style="font-size:14px">${msg}</p></div>`;}
 function toast(msg,type=''){
   const t=document.getElementById('toast');

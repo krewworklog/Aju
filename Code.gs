@@ -11,7 +11,7 @@
 const SHEETS = {
   staff:    ['id', 'name', 'username', 'password', 'createdAt'],
   managers: ['id', 'name', 'username', 'password', 'createdAt'],
-  clients:  ['name'],
+  clients:  ['name', 'services'],
   entries:  ['id', 'staffId', 'staffName', 'date', 'gnotes', 'rows', 'late', 'reason', 'approved', 'submittedAt', 'usedCodeId', 'editedAt', 'entry', 'entryLabel', 'deadline'],
   codes:    ['id', 'code', 'staffId', 'staffName', 'note', 'issuedByRole', 'issuedById', 'issuedByName', 'generatedAt', 'generatedDate', 'generatedTime', 'used', 'usedBy', 'usedByName', 'usedAt'],
   reports:  ['id', 'weekStart', 'weekEnd', 'submittedAt', 'submittedBy', 'submittedById', 'breakdown', 'note', 'totalHours'],
@@ -44,7 +44,8 @@ function handleRequest(e) {
       case 'addManager':   result = addRow(ss, 'managers', JSON.parse(params.data)); break;
       case 'deleteManager':result = deleteRow(ss, 'managers', params.id); break;
       case 'resetManager': result = updateField(ss, 'managers', params.id, 'password', params.password); break;
-      case 'addClient':    result = addClient(ss, params.name); break;
+      case 'addClient':    result = addClient(ss, params.name, params.services); break;
+      case 'setClientServices': result = setClientServices(ss, params.name, params.services); break;
       case 'deleteClient': result = deleteClient(ss, params.name); break;
       case 'addEntry':     result = addEntryWithProofs(ss, params); break;
       case 'updateEntry':  result = updateEntryWithProofs(ss, params); break;
@@ -147,7 +148,14 @@ function getAll(ss) {
   const tz = ss.getSpreadsheetTimeZone();
   const staff = sheetToObjects(ss.getSheetByName('staff')).map(s => ({ ...s, createdAt: dateCellToString(s.createdAt, tz) }));
   const managers = sheetToObjects(ss.getSheetByName('managers')).map(m => ({ ...m, createdAt: dateCellToString(m.createdAt, tz) }));
-  const clients = sheetToObjects(ss.getSheetByName('clients')).map(c => c.name);
+  const rawClients = sheetToObjects(ss.getSheetByName('clients'));
+  const clients = rawClients.map(c => c.name);
+  const clientServices = {};
+  rawClients.forEach(c => {
+    let svc = [];
+    if (c.services) { try { svc = typeof c.services === 'string' ? JSON.parse(c.services) : c.services; } catch (e) { svc = []; } }
+    clientServices[c.name] = Array.isArray(svc) ? svc : [];
+  });
   const rawEntries = sheetToObjects(ss.getSheetByName('entries'));
   const entries = rawEntries.map(e => ({
     ...e,
@@ -189,7 +197,7 @@ function getAll(ss) {
   }));
   const config = sheetToObjects(ss.getSheetByName('config'));
   const execCode = (config.find(c => c.key === 'execCode') || {}).value || DEFAULT_EXEC_CODE;
-  return { staff, managers, clients, entries, codes, reports, tasks, leads, attendance, execCode: String(execCode) };
+  return { staff, managers, clients, clientServices, entries, codes, reports, tasks, leads, attendance, execCode: String(execCode) };
 }
 
 // Attendance: one record per staff per day. Check-in / check-out / overtime all
@@ -391,12 +399,29 @@ function setLeadSales(ss, params) {
   return { ok: false, error: 'Not found' };
 }
 
-function addClient(ss, name) {
+function addClient(ss, name, services) {
   const sh = ss.getSheetByName('clients');
   const existing = sheetToObjects(sh).map(c => c.name);
   if (existing.includes(name)) return { ok: false, error: 'exists' };
-  sh.appendRow([name]);
+  const headers = sheetHeaders(sh, 'clients');
+  const row = headers.map(h => h === 'name' ? name : (h === 'services' ? (services || '[]') : ''));
+  sh.appendRow(row);
   return { ok: true };
+}
+
+function setClientServices(ss, name, services) {
+  const sh = ss.getSheetByName('clients');
+  const headers = sheetHeaders(sh, 'clients');
+  const col = headers.indexOf('services');
+  if (col < 0) return { ok: false, error: 'no services column' };
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(name)) {
+      sh.getRange(i + 1, col + 1).setValue(services || '[]');
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Not found' };
 }
 
 function deleteClient(ss, name) {
