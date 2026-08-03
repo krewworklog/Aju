@@ -1,3 +1,9 @@
+/* ═══════════════════════════════════════════════════════════════
+   ██  KREW  MARKETING  —  WorkLog  backend
+   ██  PASTE THIS ONLY INTO THE SCRIPT BOUND TO:  "worklog database"
+   ██  (Krew staff work logs, attendance, leads, increment program)
+   ██  DO NOT paste into the Al Rasa project.
+   ═══════════════════════════════════════════════════════════════ */
 /**
  * WorkLog — Google Sheets Backend (v9 — entry proof screenshots + manager reviews)
  * Deploy as Web App: Execute as "Me", Access "Anyone"
@@ -38,11 +44,25 @@ const UPLOAD_FOLDER = 'WorkLog Uploads';
 function doGet(e) { return handleRequest(e); }
 function doPost(e) { return handleRequest(e); }
 
+
+// ── Wrong-project guard ────────────────────────────────────────
+// This code must only ever run against the Krew WorkLog spreadsheet. If it is
+// pasted into another project by mistake, refuse instead of taking over.
+const APP_ID = 'krew';
+function assertRightSpreadsheet(ss) {
+  const names = ss.getSheets().map(function (x) { return x.getName().toLowerCase(); });
+  const looksAlRasa = names.indexOf('invoices') !== -1 && names.indexOf('collection') !== -1 && names.indexOf('entries') === -1;
+  if (looksAlRasa) {
+    throw new Error('WRONG PROJECT: this is the KREW backend, but the spreadsheet looks like Al Rasa Collection DB. Paste Desktop/AlRasa/Code.gs here instead.');
+  }
+}
+
 function handleRequest(e) {
   try {
     const params = (e.parameter || {});
     const action = params.action;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    assertRightSpreadsheet(ss);
     ensureSheets(ss);
     try { ensureMonthlyReportTasks(ss); } catch (e) { /* never block a request on this */ }
 
