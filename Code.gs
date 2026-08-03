@@ -777,7 +777,13 @@ function ensureMonthlyReportTasks(ss) {
   const data = cfg.getDataRange().getValues();
   let row = -1, done = '';
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === 'reportTasksMonth') { row = i + 1; done = String(data[i][1]); break; }
+    if (data[i][0] === 'reportTasksMonth') {
+      row = i + 1;
+      // Sheets may have stored "2026-08" as a real date — normalise before
+      // comparing, otherwise the guard never matches and tasks duplicate.
+      done = String(dateCellToString(data[i][1], tz)).slice(0, 7);
+      break;
+    }
   }
   if (done === month) { cache.put('rptTasks_' + month, '1', 21600); return; }
 
@@ -801,6 +807,10 @@ function ensureMonthlyReportTasks(ss) {
     };
     tasksSh.appendRow(headers.map(h => obj[h] !== undefined ? obj[h] : ''));
   });
-  if (row > 0) cfg.getRange(row, 2).setValue(month); else cfg.appendRow(['reportTasksMonth', month]);
+  // Store as text so Sheets cannot reinterpret "2026-08" as a date.
+  if (row < 0) { cfg.appendRow(['reportTasksMonth', '']); row = cfg.getLastRow(); }
+  const cell = cfg.getRange(row, 2);
+  cell.setNumberFormat('@');
+  cell.setValue(month);
   cache.put('rptTasks_' + month, '1', 21600);
 }
