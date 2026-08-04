@@ -61,6 +61,16 @@ function assertRightSpreadsheet(ss) {
   if (name.indexOf('al rasa') >= 0 || name.indexOf('alrasa') >= 0) {
     throw new Error('WRONG PROJECT: this is the KREW backend, but it is bound to "' + ss.getName() + '" (the Al Rasa database). Paste Desktop/AlRasa/Code.gs here instead.');
   }
+  // The decisive test: Al Rasa's config tab holds openingBalance/openingDate,
+  // which Krew never writes. This survives the stray-tab contamination that
+  // made the old tab-name check useless.
+  const cfg = ss.getSheetByName('config');
+  if (cfg) {
+    const keys = cfg.getDataRange().getValues().map(r => String(r[0]));
+    if (keys.indexOf('openingBalance') >= 0 || keys.indexOf('openingDate') >= 0) {
+      throw new Error('WRONG PROJECT: this is the KREW backend, but it is bound to "' + ss.getName() + '", which is the Al Rasa database. Paste Desktop/AlRasa/Code.gs here instead.');
+    }
+  }
   const hasEntries = !!ss.getSheetByName('entries');
   const hasInvoices = !!ss.getSheetByName('invoices');
   if (!hasEntries && hasInvoices) {
