@@ -408,6 +408,7 @@ textarea{resize:vertical;line-height:1.6;}
       <!-- STAFF: MY LOGS -->
       <div class="page" id="page-my-logs">
         <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit a log before its own deadline (Entry 1 · 3:00 PM, Entry 2 · 7:30 PM).</p></div></div>
+        <div id="my-logs-window"></div>
         <div id="my-logs-list"></div>
       </div>
 
@@ -795,7 +796,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v22';
+const APP_VERSION='v23';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1070,6 +1071,16 @@ const ENTRIES=[
   {num:2,label:'Entry 2',deadlineMins:19*60+30, deadlineLabel:'7:30 PM'},
 ];
 function entryDef(n){return ENTRIES.find(e=>e.num===Number(n))||ENTRIES[0];}
+// One-off correction window: entries dated 1–4 Aug can be re-opened and fixed
+// by the staff member who logged them, up to the end of 5 Aug (Dubai). After
+// that the normal rule returns — an entry is editable only before its own
+// slot deadline on the day it was logged.
+const EDIT_WINDOW={from:'2026-08-01', to:'2026-08-04', lastDay:'2026-08-05'};
+function editWindowOpen(){return todayStr()<=EDIT_WINDOW.lastDay;}
+function inEditWindow(dateStr){
+  const d=String(dateStr||'').slice(0,10);
+  return editWindowOpen() && d>=EDIT_WINDOW.from && d<=EDIT_WINDOW.to;
+}
 let currentEntry=1; // which entry the staff is currently logging
 function isLateForEntry(n){return dubaiMinutes()>entryDef(n).deadlineMins;}
 // FEATURE 1: Entry 2 is locked until the Entry 1 deadline (Entry 1 is always open).
@@ -1250,7 +1261,9 @@ function submittedEntriesToday(){
     .map(e=>Number(e.entry)));
 }
 function setEntry(n){
-  if(entryLocked(n)){toast(`Entry 2 opens at ${ENTRIES[0].deadlineLabel} (Dubai).`,'err');return;}
+  // While editing an existing entry the slot is already fixed, so the
+  // "Entry 2 opens at 3 PM" lock must not block re-opening it.
+  if(entryLocked(n)&&!editingId){toast(`Entry 2 opens at ${ENTRIES[0].deadlineLabel} (Dubai).`,'err');return;}
   currentEntry=Number(n);
   document.getElementById('submit-btn').textContent=editingId?'💾 Save Changes':`✔ Submit ${entryDef(currentEntry).label}`;
   renderEntryTabs();
@@ -1390,7 +1403,11 @@ async function submitLog(){
   submitting=true;
   try {
     if(editingId){
-      await apiPost('updateEntry',{data:{id:editingId,staffId,staffName,date,gnotes,rows,late:false,reason:'',approved:false,submittedAt,usedCodeId:'',editedAt:submittedAt,entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel},proofs});
+      // Editing corrects the work described, not the submission record: the
+      // original time, late flag and approval code stay as they were, so a
+      // late entry cannot be edited into an on-time one.
+      const orig=DB.entries.find(en=>String(en.id)===String(editingId))||{};
+      await apiPost('updateEntry',{data:{id:editingId,staffId,staffName,date,gnotes,rows,late:!!orig.late,reason:orig.reason||'',approved:!!orig.approved,submittedAt:orig.submittedAt||submittedAt,usedCodeId:orig.usedCodeId||'',editedAt:submittedAt,entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel},proofs});
       toast('Entry updated!','ok');
     } else {
       await apiPost('addEntry',{data:{id:'e'+Date.now(),staffId,staffName,date,gnotes,rows,late,reason,approved,submittedAt,usedCodeId,editedAt:'',entry:currentEntry,entryLabel:entryDef(currentEntry).label,deadline:entryDef(currentEntry).deadlineLabel},proofs});
@@ -1407,11 +1424,15 @@ function renderMyLogs(){
   const mine=DB.entries.filter(e=>e.staffId===session.user.id).reverse();
   const el=document.getElementById('my-logs-list');
   el.innerHTML=mine.length?mine.map(e=>entryCard(e,true)).join(''):emptyState('📭','No entries yet.');
+  const w=document.getElementById('my-logs-window');
+  if(w)w.innerHTML=editWindowOpen()
+    ? `<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:12px"><span>✏</span><span><strong>Correction window open</strong> — entries dated 1–4 August can be edited until the end of 5 August. After that, entries lock at their own deadline as usual.</span></div>`
+    : '';
 }
 async function editEntry(id){
   const e=DB.entries.find(en=>String(en.id)===String(id));if(!e)return;
   const en=Number(e.entry)||1;
-  if(isLateForEntry(en)){toast(`Editing is locked after the ${entryDef(en).label} deadline (${entryDef(en).deadlineLabel}).`,'err');return;}
+  if(isLateForEntry(en)&&!inEditWindow(e.date)){toast(`Editing is locked after the ${entryDef(en).label} deadline (${entryDef(en).deadlineLabel}).`,'err');return;}
   editingId=id;
   document.getElementById('f-date').value=e.date;
   document.getElementById('f-gnotes').value=e.gnotes||'';
@@ -1431,7 +1452,7 @@ function entryCard(e,isOwner){
   const totH=(e.rows||[]).reduce((s,r)=>s+(parseFloat(r.hours)||0),0);
   const en=Number(e.entry)||0;
   const entryLabel=e.entryLabel||(en?entryDef(en).label:'');
-  const canEdit=isOwner&&en&&!isLateForEntry(en);
+  const canEdit=isOwner&&en&&(!isLateForEntry(en)||inEditWindow(e.date));
   const code=e.usedCodeId?DB.codes.find(c=>String(c.id)===String(e.usedCodeId)):null;
   const codeIssuerLabel=code?(code.issuedByRole==='exec'?'Executive':code.issuedByName||'Manager'):'';
   return `<div class="ec">
