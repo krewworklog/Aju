@@ -2722,11 +2722,37 @@ async function apiPost(action,data={}){
   const body=new URLSearchParams();body.append('action',action);
   for(const k in data){const v=data[k];body.append(k,typeof v==='object'?JSON.stringify(v):v);}
   try{
-    const res=await fetch(BACKEND_URL,{method:'POST',body});
-    const json=await res.json();
-    if(json.error)throw new Error(json.error);
-    setSyncStatus('');return json;
-  }catch(err){setSyncStatus('error');throw err;}finally{showLoading(false);}
+    // Same resilience as api(): Apps Script sometimes stalls or answers with
+    // an HTML page instead of JSON. Time out, parse safely, retry once.
+    // (Uploads are NOT retried blindly — the backend dedupes by id/slot.)
+    let lastErr=null;
+    for(let attempt=1; attempt<=2; attempt++){
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(), 30000);   // uploads can be slow
+      try{
+        const res=await fetch(BACKEND_URL,{method:'POST',body,signal:ctrl.signal});
+        const text=await res.text();
+        let json=null;
+        try{ json=JSON.parse(text); }catch(_){ json=null; }
+        if(json){
+          if(json.error)throw new Error(json.error);
+          setSyncStatus('');return json;
+        }
+        lastErr=new Error('The server did not respond properly.');
+      }catch(e){
+        // A timeout is NOT retried: the write may have landed server-side,
+        // and retrying could duplicate it. Only a garbage (non-JSON)
+        // response — which means Google's front door rejected the request —
+        // is retried.
+        if(e && e.name==='AbortError'){ setSyncStatus('error'); throw new Error('The server took too long to respond. Check My Logs before submitting again.'); }
+        if(e && e.message && !/did not respond properly/.test(e.message)){ setSyncStatus('error'); throw e; }
+        lastErr=e;
+      }finally{ clearTimeout(timer); }
+      if(attempt<2) await new Promise(r=>setTimeout(r,700));
+    }
+    setSyncStatus('error');
+    throw lastErr||new Error('The server did not respond. Please try again.');
+  }finally{showLoading(false);}
 }
 
 // Deadline (stored as "YYYY-MM-DDTHH:MM") interpreted in Dubai time (UTC+4).
