@@ -54,6 +54,13 @@ function assertRightSpreadsheet(ss) {
   // runs on every request, so it must not cost anything noticeable.
   const cache = CacheService.getScriptCache();
   if (cache.get('sheet_ok_krew') === '1') return;
+  // Tab names alone are no longer conclusive: both spreadsheets picked up
+  // stray tabs from the other app during the mix-up, so Al Rasa's database
+  // now HAS an 'entries' tab. The file name is the reliable signal.
+  const name = String(ss.getName() || '').toLowerCase();
+  if (name.indexOf('al rasa') >= 0 || name.indexOf('alrasa') >= 0) {
+    throw new Error('WRONG PROJECT: this is the KREW backend, but it is bound to "' + ss.getName() + '" (the Al Rasa database). Paste Desktop/AlRasa/Code.gs here instead.');
+  }
   const hasEntries = !!ss.getSheetByName('entries');
   const hasInvoices = !!ss.getSheetByName('invoices');
   if (!hasEntries && hasInvoices) {
