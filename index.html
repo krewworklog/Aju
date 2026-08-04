@@ -791,6 +791,27 @@ async function api(action, data={}) {
 }
 
 // First-run: backend URL check
+// ── Auto-update notice ───────────────────────────────────────
+// The app is served from GitHub Pages; a new deploy just changes the files.
+// Poll a tiny version file and offer a one-tap refresh when it changes, so
+// nobody has to know about cache-clearing rituals.
+const APP_VERSION='v22';
+function checkUpdate(){
+  fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
+    if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
+      const b=document.createElement('div');
+      b.id='upd-bar';
+      b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:200;background:var(--accent);color:#fff;text-align:center;padding:10px;font-size:13px;font-weight:600;cursor:pointer';
+      b.textContent='A new version of the app is available — tap here to update';
+      b.onclick=()=>location.reload();
+      document.body.appendChild(b);
+    }
+  }).catch(()=>{});
+}
+setInterval(checkUpdate, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkUpdate(); });
+checkUpdate();
+
 function init(){
   if(!BACKEND_URL){
     document.getElementById('screen-setup').classList.add('active');
