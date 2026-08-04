@@ -50,11 +50,16 @@ function doPost(e) { return handleRequest(e); }
 // pasted into another project by mistake, refuse instead of taking over.
 const APP_ID = 'krew';
 function assertRightSpreadsheet(ss) {
-  const names = ss.getSheets().map(function (x) { return x.getName().toLowerCase(); });
-  const looksAlRasa = names.indexOf('invoices') !== -1 && names.indexOf('collection') !== -1 && names.indexOf('entries') === -1;
-  if (looksAlRasa) {
+  // Two cheap lookups instead of enumerating every tab, and cached — this
+  // runs on every request, so it must not cost anything noticeable.
+  const cache = CacheService.getScriptCache();
+  if (cache.get('sheet_ok_krew') === '1') return;
+  const hasEntries = !!ss.getSheetByName('entries');
+  const hasInvoices = !!ss.getSheetByName('invoices');
+  if (!hasEntries && hasInvoices) {
     throw new Error('WRONG PROJECT: this is the KREW backend, but the spreadsheet looks like Al Rasa Collection DB. Paste Desktop/AlRasa/Code.gs here instead.');
   }
+  cache.put('sheet_ok_krew', '1', 21600);
 }
 
 function handleRequest(e) {
@@ -253,7 +258,7 @@ function getAll(ss) {
   }));
   return { staff, managers, clients, clientServices, entries, codes, reports, tasks, leads, attendance,
            incMembers, deliverables, incWork, incReports,
-           config: configMap, execCode: String(execCode) };
+           config: configMap, codeVersion: CODE_VERSION, execCode: String(execCode) };
 }
 
 // Attendance: one record per staff per day. Check-in / check-out / overtime all
@@ -368,7 +373,39 @@ function applyProofs(obj, proofsJson) {
 
 function addEntryWithProofs(ss, params) {
   const obj = applyProofs(JSON.parse(params.data), params.proofs);
+  // One entry per staff per date per slot. If the same slot is submitted
+  // again — a double tap, or a retry after a lost response — update that
+  // row instead of adding a second one that would be counted twice.
+  const sh = ss.getSheetByName('entries');
+  const headers = sheetHeaders(sh, 'entries');
+  const tz = ss.getSpreadsheetTimeZone();
+  const col = h => headers.indexOf(h);
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const sameStaff = String(data[i][col('staffId')]) === String(obj.staffId);
+    const sameDate  = String(dateCellToString(data[i][col('date')], tz)) === String(obj.date);
+    const sameSlot  = String(data[i][col('entry')]) === String(obj.entry);
+    const sameId    = String(data[i][0]) === String(obj.id);
+    if (sameId || (sameStaff && sameDate && sameSlot && obj.entry)) {
+      obj.id = data[i][0];
+      return updateEntryRow(ss, obj, i + 1);
+    }
+  }
   return addRow(ss, 'entries', obj);
+}
+
+// Write an entry object over an existing row.
+function updateEntryRow(ss, obj, rowNum) {
+  const sh = ss.getSheetByName('entries');
+  const headers = sheetHeaders(sh, 'entries');
+  const row = headers.map(h => {
+    let v = obj[h];
+    if (h === 'rows' && Array.isArray(v)) v = JSON.stringify(v);
+    if (v === undefined || v === null) v = '';
+    return v;
+  });
+  sh.getRange(rowNum, 1, 1, headers.length).setValues([row]);
+  return { ok: true, deduped: true };
 }
 
 function updateEntryWithProofs(ss, params) {
