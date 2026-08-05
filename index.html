@@ -796,7 +796,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v23';
+const APP_VERSION='v24';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1077,6 +1077,16 @@ function entryDef(n){return ENTRIES.find(e=>e.num===Number(n))||ENTRIES[0];}
 // slot deadline on the day it was logged.
 const EDIT_WINDOW={from:'2026-08-01', to:'2026-08-04', lastDay:'2026-08-05'};
 function editWindowOpen(){return todayStr()<=EDIT_WINDOW.lastDay;}
+// One-off attendance correction window: staff can fix their own check-in and
+// check-out for 1–6 Aug, up to 7:00 PM on 6 Aug (Dubai). From 7 Aug only the
+// live Check In / Check Out buttons remain, as normal.
+const ATTN_WINDOW={from:'2026-08-01', to:'2026-08-06', lastDay:'2026-08-06', closeMins:19*60, closeLabel:'7:00 PM'};
+function attnWindowOpen(){
+  const t=todayStr();
+  if(t<ATTN_WINDOW.lastDay) return true;
+  if(t===ATTN_WINDOW.lastDay) return dubaiMinutes()<ATTN_WINDOW.closeMins;
+  return false;
+}
 function inEditWindow(dateStr){
   const d=String(dateStr||'').slice(0,10);
   return editWindowOpen() && d>=EDIT_WINDOW.from && d<=EDIT_WINDOW.to;
@@ -1658,6 +1668,17 @@ function renderMyAttendance(){
         ${rec&&rec.checkOut?`<span class="tag t-late">🔴 Out at ${rec.checkOut}</span><span class="tag t-pu">${attnHoursWorked(rec).toFixed(1)}h worked</span>`:''}
       </div>`}
   </div>`;
+  const fixCard=!attnWindowOpen()?'':`<div class="card" style="border-color:rgba(245,158,11,.35)">
+    <div class="ct" style="color:var(--amber)">✏ Fix a missed check-in / check-out</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:10px">Open until <strong>${ATTN_WINDOW.closeLabel} on ${ATTN_WINDOW.lastDay}</strong> for days between ${ATTN_WINDOW.from} and ${ATTN_WINDOW.to}. After that only today's buttons above work.</p>
+    <div class="fg">
+      <div class="f"><label>Date</label><input type="date" id="fx-date" value="${today<=ATTN_WINDOW.to?today:ATTN_WINDOW.to}" min="${ATTN_WINDOW.from}" max="${ATTN_WINDOW.to}" onchange="attnLoadFix()"/></div>
+      <div class="f"><label>Checked in at</label><input type="time" id="fx-in"/></div>
+      <div class="f"><label>Checked out at</label><input type="time" id="fx-out"/></div>
+    </div>
+    <p style="font-size:12px;color:var(--ink3);margin-top:6px" id="fx-hint"></p>
+    <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="attnSaveFix()">💾 Save times</button>
+  </div>`;
   const otCard=`<div class="card">
     <div class="ct">⏱ Log overtime (outside office hours)</div>
     <p style="font-size:12px;color:var(--ink3);margin-bottom:8px">Recorded for the executive as a reference — not automatically added to pay.</p>
@@ -1672,7 +1693,34 @@ function renderMyAttendance(){
   const hist=`<div class="card"><div class="ct">Recent attendance</div>${mine.length?`<table class="stbl"><thead><tr><th>Date</th><th>In</th><th>Out</th><th>Worked</th><th>Expected</th><th>Overtime</th></tr></thead><tbody>
     ${mine.map(a=>`<tr><td>${a.date}</td><td>${a.checkIn||'—'}</td><td>${a.checkOut||'—'}</td><td>${attnHoursWorked(a)?attnHoursWorked(a).toFixed(1)+'h':'—'}</td><td>${expectedHoursForDay(a.date)}h</td><td>${a.otHours?parseFloat(a.otHours)+'h — '+escapeHtml(a.otNote||''):'—'}</td></tr>`).join('')}
   </tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No attendance records yet.</p>'}</div>`;
-  el.innerHTML=todayCard+otCard+hist;
+  el.innerHTML=todayCard+fixCard+otCard+hist;
+  if(fixCard)attnLoadFix();
+}
+// Show what is already recorded for the chosen day, so staff correct rather
+// than overwrite blindly.
+function attnLoadFix(){
+  const d=document.getElementById('fx-date');if(!d)return;
+  const rec=attnFor(session.user.id,d.value);
+  document.getElementById('fx-in').value=(rec&&rec.checkIn)||'';
+  document.getElementById('fx-out').value=(rec&&rec.checkOut)||'';
+  const hint=document.getElementById('fx-hint');
+  if(expectedHoursForDay(d.value)===0){hint.textContent='Sunday is a day off — no attendance is expected.';return;}
+  hint.textContent=rec?`Currently recorded: in ${rec.checkIn||'—'}, out ${rec.checkOut||'—'}. Office hours ${officeHoursLabel(d.value)}.`
+                     :`Nothing recorded for this day yet. Office hours ${officeHoursLabel(d.value)}.`;
+}
+async function attnSaveFix(){
+  if(!attnWindowOpen()){toast(`Corrections closed at ${ATTN_WINDOW.closeLabel} on ${ATTN_WINDOW.lastDay}.`,'err');return;}
+  const date=document.getElementById('fx-date').value;
+  const ci=document.getElementById('fx-in').value;
+  const co=document.getElementById('fx-out').value;
+  if(!date||date<ATTN_WINDOW.from||date>ATTN_WINDOW.to){toast(`Pick a date between ${ATTN_WINDOW.from} and ${ATTN_WINDOW.to}.`,'err');return;}
+  if(expectedHoursForDay(date)===0){toast('Sunday is a day off — nothing to record.','err');return;}
+  if(!ci&&!co){toast('Enter a check-in or check-out time.','err');return;}
+  if(ci&&co&&parseHM(co)<=parseHM(ci)){toast('Check-out must be after check-in.','err');return;}
+  try{
+    await api('attnCheckIn',{staffId:session.user.id,staffName:session.user.name,date,checkIn:ci,checkOut:co});
+    await syncAll();renderMyAttendance();toast('Attendance updated ✅','ok');
+  }catch(e){toast('Failed: '+e.message,'err');}
 }
 async function attnCheckIn(){
   try{await api('attnCheckIn',{staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkIn:nowTime()});await syncAll();renderMyAttendance();toast('Checked in ✅','ok');}
