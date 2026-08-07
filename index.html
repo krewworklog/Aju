@@ -796,7 +796,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v24';
+const APP_VERSION='v25';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1080,7 +1080,10 @@ function editWindowOpen(){return todayStr()<=EDIT_WINDOW.lastDay;}
 // One-off attendance correction window: staff can fix their own check-in and
 // check-out for 1–6 Aug, up to 7:00 PM on 6 Aug (Dubai). From 7 Aug only the
 // live Check In / Check Out buttons remain, as normal.
-const ATTN_WINDOW={from:'2026-08-01', to:'2026-08-06', lastDay:'2026-08-06', closeMins:19*60, closeLabel:'7:00 PM'};
+// Reopened and extended to 7 Aug: the staff-id fault collapsed 5, 6 and 7 Aug
+// into a single shared attendance row, so most of the team has no record for
+// those days and has to re-enter it.
+const ATTN_WINDOW={from:'2026-08-01', to:'2026-08-07', lastDay:'2026-08-08', closeMins:19*60, closeLabel:'7:00 PM'};
 function attnWindowOpen(){
   const t=todayStr();
   if(t<ATTN_WINDOW.lastDay) return true;
@@ -1173,6 +1176,13 @@ async function doLogin(){
     const p=document.getElementById('l-password').value.trim();
     const a=DB.staff.find(a=>String(a.username).toLowerCase()===u.toLowerCase()&&String(a.password)===p);
     if(!a){err.style.display='block';return;}
+    // A blank id means the staff sheet is damaged. Signing in anyway would
+    // give everyone the same identity — shared logs, one shared attendance
+    // row for the whole team. Refuse instead of quietly cross-wiring accounts.
+    if(!String(a.id||'').trim()){
+      err.textContent='Your account is missing its ID — the staff records need repair. Please tell the executive before logging in again.';
+      err.style.display='block';return;
+    }
     session={user:a,role:'staff'};
   }else if(loginRole==='manager'){
     const u=document.getElementById('lm-username').value.trim();
