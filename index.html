@@ -329,6 +329,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('my-targets',this)"><span class="nav-ic">🎯</span>My Targets<span class="nbadge purple" id="b-mytargets">0</span></div>
         <div class="nav" onclick="gp('my-attendance',this)"><span class="nav-ic">🕘</span>My Attendance<span class="nbadge amber" id="b-myattn"></span></div>
         <div class="nav" onclick="gp('my-increment',this)"><span class="nav-ic">📈</span>Increment<span class="nbadge purple" id="b-myinc"></span></div>
+        <div class="nav" onclick="gp('my-salary',this)"><span class="nav-ic">💰</span>My Salary</div>
       </div>
       <div id="sb-manager" style="display:none">
         <div class="sbl">Dashboard</div>
@@ -646,6 +647,14 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="my-inc-wrap"></div>
       </div>
 
+      <!-- STAFF: MY SALARY -->
+      <div class="page" id="page-my-salary">
+        <div class="ph"><div><div class="pt">My Salary</div><p class="ps">Where your pay stands for the month — base, attendance, any deductions, and your increment if you qualified.</p></div>
+          <input type="month" id="mysal-month" onchange="renderMySalary()" style="width:auto"/>
+        </div>
+        <div id="my-sal-wrap"></div>
+      </div>
+
       <!-- MANAGER: TASKS -->
       <div class="page" id="page-mgr-tasks">
         <div class="ph"><div><div class="pt">Tasks</div><p class="ps">Assign tasks to staff and track completion.</p></div><button class="btn btn-primary btn-sm" onclick="openTaskModal()">＋ New Task</button></div>
@@ -796,7 +805,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v25';
+const APP_VERSION='v26';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1023,6 +1032,17 @@ const SALARIES={'Fathima Salahudheen':4500,'Muhammed Jasim':4500,'Vyshak Babu':3
 const ENTRY_CUT_START='2026-08'; // 20 AED per missed entry, from August 2026
 const ENTRY_CUT=20;
 const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead target
+// Attendance and entry logging were unreliable until the check-out bug was
+// fixed on 20 Aug 2026, so every working day up to and including this date is
+// paid as a full day with no missed-entry cut. Normal rules resume the day after.
+const GRACE_UNTIL='2026-08-17';
+const ONBOARD_CUT_PCT=5;         // % salary cut when client onboarding is not signed off
+function onboardKey(month,staffId){return 'onb-'+month+'-'+staffId;}
+function onboardState(month,staffId){return String((DB.config||{})[onboardKey(month,staffId)]||'');}
+async function setOnboard(staffId,month,val){
+  try{await api('setConfigKey',{key:onboardKey(month,staffId),value:val});await syncAll();renderExecSalary();toast('Onboarding updated.','ok');}
+  catch(e){toast('Failed: '+e.message,'err');}
+}
 
 const SALES_STATUSES=['Contacted','Approved','Denied','No response'];
 function leadTargetDef(l){return LEAD_TARGETS.find(t=>t.id===String(l.targetId))||LEAD_TARGETS[0];}
@@ -1232,6 +1252,7 @@ function gp(id,el){
     'mgr-sales':renderMgrSales,
     'exec-compliance':renderExecCompliance,
     'exec-salary':renderExecSalary,
+    'my-salary':renderMySalary,
     'exec-attendance':renderExecAttendance,
     'my-increment':renderMyIncrement,
     'mgr-increment':()=>renderIncProgram('mgr'),
@@ -1772,6 +1793,77 @@ function attnMonthlyForStaff(s,days){
   });
   return {exp,pres,ot,daysPresent};
 }
+
+// ── Salary helpers — shared by the executive table and the staff view, so the
+// two can never disagree about what someone is owed. ────────────────────────
+// Attendance for PAY only. Days on or before GRACE_UNTIL count as full days;
+// the Attendance report deliberately still shows real hours, because the grace
+// is a payroll decision, not a claim about who was actually in the office.
+function attnMonthlyForSalary(s,days){
+  let exp=0,pres=0,graced=0;
+  days.forEach(date=>{
+    if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
+    const eh=expectedHoursForDay(date);
+    exp+=eh;
+    if(date<=GRACE_UNTIL){pres+=eh;graced++;return;}
+    const a=attnFor(s.id,date);
+    if(a)pres+=attnPresentHours(a);
+  });
+  return {exp,pres,graced};
+}
+function salaryDays(month,countEnd){
+  const days=[];let cur=month+'-01';
+  while(cur<=countEnd&&days.length<32){
+    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
+    cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  }
+  return days;
+}
+function salaryRowFor(s,month,days,monthOver){
+  const cutsActive=month>=ENTRY_CUT_START;
+  const attnActive=month>=ATTENDANCE_START;
+  const base=SALARIES[s.name]!==undefined?SALARIES[s.name]:null;
+  let missedSlots=0;
+  days.forEach(date=>{
+    if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
+    if(date<=GRACE_UNTIL)return;              // graced: entries not counted
+    const n=DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length;
+    missedSlots+=Math.max(0,2-n);
+  });
+  const att=attnMonthlyForSalary(s,days);
+  const attFactor=(attnActive&&att.exp>0)?Math.min(1,att.pres/att.exp):1;
+  const attPay=base!=null?Math.round(base*attFactor):null;
+  const entryCut=cutsActive&&base!=null?missedSlots*ENTRY_CUT:0;
+  let targetCut=0;
+  const targets=targetsFor(s.name).map(t=>{
+    const ok=leadsForTarget(t.id,month).length;
+    const done=ok>=t.goal;
+    if(!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
+    return {t,ok,done};
+  });
+  // Onboarding: the executive signs off once a month. An explicit "no" bites
+  // immediately; leaving it unmarked only bites once the month has closed, so
+  // nobody is docked for a review that simply has not happened yet.
+  const onb=onboardState(month,s.id);
+  const onbCut=(base!=null&&onb!=='yes'&&(onb==='no'||monthOver))?Math.round(base*ONBOARD_CUT_PCT/100):0;
+  const enrolled=!!incMemberFor(s.id);
+  const assess=enrolled?incAssess(s,month):null;
+  const incQualified=!!(assess&&assess.qualified);
+  const incAmount=(incQualified&&base!=null)?Math.round(base*incRaisePct()/100):0;
+  const finalPay=base!=null?attPay-entryCut-targetCut-onbCut+incAmount:null;
+  return {s,base,att,attFactor,attPay,missedSlots,entryCut,targets,targetCut,onb,onbCut,
+          enrolled,assess,incQualified,incAmount,finalPay,cutsActive,attnActive};
+}
+function targetTagsHtml(row,monthOver){
+  return row.targets.length?row.targets.map(x=>
+    `<span class="tag ${x.done?'t-ok':(monthOver?'t-late':'t-pu')}">${x.t.icon} ${x.ok}/${x.t.goal}${x.done?' ✓':(monthOver?' ✗':'')}</span>`
+  ).join(' '):'<span style="color:var(--ink3)">—</span>';
+}
+function onboardTag(onb,monthOver){
+  if(onb==='yes')return '<span class="tag t-ok">Signed off ✓</span>';
+  if(onb==='no')return '<span class="tag t-late">Not complete ✗</span>';
+  return `<span class="tag t-pu">Not marked${monthOver?' ✗':''}</span>`;
+}
 function renderExecAttendance(){
   const mEl=document.getElementById('attn-month');if(!mEl)return;
   if(!mEl.value)mEl.value=todayStr().slice(0,7);
@@ -2049,6 +2141,46 @@ async function saveIncPct(){
 // ════════════════════════════════════════
 //  EXEC: SALARY & COMPLIANCE
 // ════════════════════════════════════════
+// Staff-facing view of their own pay. It calls the same salaryRowFor() as the
+// executive table, so the two can never show different numbers.
+function renderMySalary(){
+  const wrap=document.getElementById('my-sal-wrap');if(!wrap)return;
+  const mEl=document.getElementById('mysal-month');if(!mEl)return;
+  if(!mEl.value)mEl.value=todayStr().slice(0,7);
+  const month=mEl.value;
+  const me=(DB.staff||[]).find(x=>String(x.id)===String(session.user.id));
+  if(!me){wrap.innerHTML='<div class="card"><p style="font-size:13px;color:var(--ink3)">Your staff record could not be found — ask the executive to check your account.</p></div>';return;}
+  const monthStart=month+'-01';
+  const end=new Date(Date.parse(monthStart+'T00:00:00Z'));end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);
+  const monthEnd=end.toISOString().slice(0,10);
+  const monthOver=todayStr()>monthEnd;
+  const yesterday=localDateStr(new Date(Date.now()-86400000));
+  const countEnd=monthOver?monthEnd:(yesterday<monthEnd?yesterday:monthEnd);
+  const days=salaryDays(month,countEnd);
+  const r=salaryRowFor(me,month,days,monthOver);
+  if(r.base==null){wrap.innerHTML='<div class="card"><p style="font-size:13px;color:var(--ink3)">No base salary is set for your account yet — ask the executive to add it.</p></div>';return;}
+  const row=(label,val,hint,colour)=>`<tr><td style="padding:8px 0;font-size:13px">${label}${hint?`<div style="font-size:11px;color:var(--ink3)">${hint}</div>`:''}</td><td style="padding:8px 0;text-align:right;font-family:var(--font);font-weight:700;color:${colour||'var(--ink2)'}">${val}</td></tr>`;
+  wrap.innerHTML=`
+  <div class="card">
+    <div class="ct">💰 ${escapeHtml(me.name)} — ${month}</div>
+    <table style="width:100%;border-collapse:collapse">
+      ${row('Base salary',r.base.toLocaleString()+' AED')}
+      ${row('Attendance','× '+Math.round(r.attFactor*100)+'%',`${r.att.pres.toFixed(1)} of ${r.att.exp.toFixed(1)} hours${r.att.graced?` · ${r.att.graced} day${r.att.graced===1?'':'s'} credited in full up to ${GRACE_UNTIL}`:''}`)}
+      ${row('Pay after attendance',r.attPay.toLocaleString()+' AED')}
+      ${row('Missed entries',r.missedSlots+' slot'+(r.missedSlots===1?'':'s'),r.cutsActive?`${ENTRY_CUT} AED each · only counted after ${GRACE_UNTIL}`:'no entry cut this month')}
+      ${row('Entry deduction',r.entryCut?'− '+r.entryCut.toLocaleString()+' AED':'0',null,r.entryCut?'var(--red)':'var(--ink3)')}
+      ${row('Lead target',targetTagsHtml(r,monthOver))}
+      ${row('Target deduction',r.targetCut?'− '+r.targetCut.toLocaleString()+' AED':'0',monthOver?null:'only applies if still unmet at month end',r.targetCut?'var(--red)':'var(--ink3)')}
+      ${row('Client onboarding',onboardTag(r.onb,monthOver),'signed off by the executive')}
+      ${row('Onboarding deduction',r.onbCut?'− '+r.onbCut.toLocaleString()+' AED':'0',ONBOARD_CUT_PCT+'% if onboarding is not complete',r.onbCut?'var(--red)':'var(--ink3)')}
+      ${r.enrolled?row('Increment',r.incQualified?'+ '+r.incAmount.toLocaleString()+' AED':'not met this month',null,r.incQualified?'var(--green)':'var(--ink3)'):''}
+      <tr><td style="padding:14px 0 0;border-top:1px solid var(--line,rgba(0,0,0,.12));font-weight:800">Take-home this month</td>
+          <td style="padding:14px 0 0;border-top:1px solid var(--line,rgba(0,0,0,.12));text-align:right;font-family:var(--font);font-weight:800;font-size:18px;color:${r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay.toLocaleString()} AED</td></tr>
+    </table>
+    <p style="font-size:11px;color:var(--ink3);margin-top:12px">Covers ${days.length} working day${days.length===1?'':'s'} (${monthStart} → ${countEnd}, Sundays off).${monthOver?'':' The month is still running, so this figure will keep moving.'} Anything that looks wrong — talk to your manager.</p>
+  </div>`;
+}
+
 function renderExecSalary(){
   const mEl=document.getElementById('sal-month');if(!mEl)return;
   if(!mEl.value)mEl.value=todayStr().slice(0,7);
@@ -2072,39 +2204,14 @@ function renderExecSalary(){
   if(!attnActive)notes.push('Attendance-based pay applies from August 2026 — for this month full base pay is used regardless of hours.');
   if(!cutsActive)notes.push('Entry deductions (20 AED each) apply from August 2026 — this month shows missed counts only, with no entry cut.');
   if(!monthOver)notes.push(`Month still in progress — the ${TARGET_CUT_PCT}% target cut only applies if the goal is still unmet at month end.`);
+  if(month===GRACE_UNTIL.slice(0,7))notes.push(`Every working day up to and including ${GRACE_UNTIL} is paid as a full day with no missed-entry cut, because check-outs were being lost until the fix on 20 Aug. Normal rules apply from the next working day.`);
+  notes.push(`Onboarding: mark Yes once a staff member has completed onboarding for all their clients. An explicit No applies the ${ONBOARD_CUT_PCT}% cut straight away; left unmarked it only applies once the month has closed.`);
   banner.innerHTML=notes.length?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>ℹ️</span><span>${notes.join(' ')}</span></div>`:'';
-  const rows=DB.staff.map(s=>{
-    const base=SALARIES[s.name]!==undefined?SALARIES[s.name]:null;
-    let missedSlots=0;
-    days.forEach(date=>{
-      if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
-      const n=DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length;
-      missedSlots+=Math.max(0,2-n);
-    });
-    const att=attnMonthlyForStaff(s,days);
-    const attFactor=(attnActive&&att.exp>0)?Math.min(1,att.pres/att.exp):1;
-    const attPay=base!=null?Math.round(base*attFactor):null;
-    const entryCut=cutsActive&&base!=null?missedSlots*ENTRY_CUT:0;
-    const myT=targetsFor(s.name);
-    let targetCut=0;
-    const targetHtml=myT.length?myT.map(t=>{
-      const ok=leadsForTarget(t.id,month).length;
-      const done=ok>=t.goal;
-      if(!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
-      return `<span class="tag ${done?'t-ok':(monthOver?'t-late':'t-pu')}">${t.icon} ${ok}/${t.goal}${done?' ✓':(monthOver?' ✗':'')}</span>`;
-    }).join(' '):'<span style="color:var(--ink3)">—</span>';
-    // Salary Increment Program: qualified members earn a % raise this month.
-    const enrolled=!!incMemberFor(s.id);
-    const assess=enrolled?incAssess(s,month):null;
-    const incQualified=!!(assess&&assess.qualified);
-    const incAmount=(incQualified&&base!=null)?Math.round(base*incRaisePct()/100):0;
-    const finalPay=base!=null?attPay-entryCut-targetCut+incAmount:null;
-    return {s,base,att,attFactor,attPay,missedSlots,entryCut,targetHtml,targetCut,enrolled,assess,incQualified,incAmount,finalPay};
-  });
+  const rows=DB.staff.map(s=>salaryRowFor(s,month,days,monthOver));
   const totBase=rows.reduce((a,r)=>a+(r.base||0),0);
   const totFinal=rows.reduce((a,r)=>a+(r.finalPay||0),0);
   document.getElementById('sal-table').innerHTML=`
-    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Increment</th><th>Final (AED)</th></tr></thead><tbody>
+    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Onboarding</th><th>Onb. cut</th><th>Increment</th><th>Final (AED)</th></tr></thead><tbody>
     ${rows.map(r=>{
       const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
       return `<tr>
@@ -2114,12 +2221,18 @@ function renderExecSalary(){
       <td style="color:${attnActive&&r.attPay!=null&&r.attPay<r.base?'var(--amber)':'var(--ink2)'}">${r.attPay!=null?r.attPay.toLocaleString():'—'}</td>
       <td><span class="tag ${r.missedSlots?'t-late':'t-ok'}">${r.missedSlots}</span></td>
       <td style="color:${r.entryCut?'var(--red)':'var(--ink3)'}">${r.entryCut?'−'+r.entryCut.toLocaleString():'0'}</td>
-      <td>${r.targetHtml}</td>
+      <td>${targetTagsHtml(r,monthOver)}</td>
       <td style="color:${r.targetCut?'var(--red)':'var(--ink3)'}">${r.targetCut?'−'+r.targetCut.toLocaleString():'0'}</td>
+      <td><select onchange="setOnboard('${r.s.id}','${month}',this.value)" style="width:auto;font-size:12px;padding:4px 6px">
+        <option value=""${r.onb===''?' selected':''}>— not marked —</option>
+        <option value="yes"${r.onb==='yes'?' selected':''}>Yes — all onboarded</option>
+        <option value="no"${r.onb==='no'?' selected':''}>No — incomplete</option>
+      </select></td>
+      <td style="color:${r.onbCut?'var(--red)':'var(--ink3)'}">${r.onbCut?'−'+r.onbCut.toLocaleString():'0'}</td>
       <td>${!r.enrolled?'<span style="color:var(--ink3)">—</span>':(r.incQualified?`<span class="tag t-ok">+${r.incAmount.toLocaleString()}</span>`:'<span class="tag t-pu">not met</span>')}</td>
       <td style="font-family:var(--font);font-weight:800;color:${r.finalPay!=null&&r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay!=null?r.finalPay.toLocaleString():'—'}</td>
     </tr>`;}).join('')}
-    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
+    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
     </tbody></table>
     <p style="font-size:11px;color:var(--ink3);margin-top:10px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Attendance pay = base × (hours present ÷ expected). Missed entries: each of the 2 daily slots counts once, at ${ENTRY_CUT} AED. Increment = +${incRaisePct()}% for enrolled staff who met all three programme targets.</p>`;
   document.getElementById('sal-leads').innerHTML=LEAD_TARGETS.map(t=>{
