@@ -330,6 +330,9 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('my-attendance',this)"><span class="nav-ic">🕘</span>My Attendance<span class="nbadge amber" id="b-myattn"></span></div>
         <div class="nav" onclick="gp('my-increment',this)"><span class="nav-ic">📈</span>Increment<span class="nbadge purple" id="b-myinc"></span></div>
         <div class="nav" onclick="gp('my-salary',this)"><span class="nav-ic">💰</span>My Salary</div>
+        <div class="sbl">Team</div>
+        <div class="nav" onclick="gp('announcements',this)"><span class="nav-ic">📢</span>Announcements<span class="nbadge amber b-ann"></span></div>
+        <div class="nav" onclick="gp('leaderboard',this)"><span class="nav-ic">🏆</span>Leaderboard</div>
       </div>
       <div id="sb-manager" style="display:none">
         <div class="sbl">Dashboard</div>
@@ -346,6 +349,9 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('mgr-staff',this)"><span class="nav-ic">👥</span>Staff Accounts</div>
         <div class="nav" onclick="gp('mgr-clients',this)"><span class="nav-ic">🏢</span>Clients</div>
         <div class="nav" onclick="gp('mgr-increment',this)"><span class="nav-ic">📈</span>Increment Program</div>
+        <div class="sbl">Team</div>
+        <div class="nav" onclick="gp('announcements',this)"><span class="nav-ic">📢</span>Announcements<span class="nbadge amber b-ann"></span></div>
+        <div class="nav" onclick="gp('leaderboard',this)"><span class="nav-ic">🏆</span>Leaderboard</div>
       </div>
       <div id="sb-exec" style="display:none">
         <div class="sbl">Executive</div>
@@ -357,6 +363,9 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-salary',this)"><span class="nav-ic">💰</span>Salary</div>
         <div class="nav" onclick="gp('exec-increment',this)"><span class="nav-ic">📈</span>Increment Program</div>
         <div class="nav" onclick="gp('exec-attendance',this)"><span class="nav-ic">🕘</span>Attendance</div>
+        <div class="sbl">Team</div>
+        <div class="nav" onclick="gp('announcements',this)"><span class="nav-ic">📢</span>Announcements<span class="nbadge amber b-ann"></span></div>
+        <div class="nav" onclick="gp('leaderboard',this)"><span class="nav-ic">🏆</span>Leaderboard</div>
         <div class="sbl">Tasks</div>
         <div class="nav" onclick="gp('exec-tasks',this)"><span class="nav-ic">🗂</span>Tasks<span class="nbadge" id="b-exec-tasks">0</span></div>
         <div class="sbl">Reports</div>
@@ -667,11 +676,34 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="exec-tasks-list"></div>
       </div>
 
+      <!-- ANNOUNCEMENTS (all roles) -->
+      <div class="page" id="page-announcements">
+        <div class="ph"><div><div class="pt">Announcements</div><p class="ps" id="ann-sub">Notices from the executive team.</p></div></div>
+        <div id="ann-wrap"></div>
+      </div>
+
+      <!-- LEADERBOARD (all roles) -->
+      <div class="page" id="page-leaderboard">
+        <div class="ph">
+          <div><div class="pt">Leaderboard</div><p class="ps">Monthly ranking across attendance, entry compliance and management score.</p></div>
+          <input type="month" id="lb-month" style="width:auto" onchange="loadLeaderboard()"/>
+        </div>
+        <div id="lb-wrap"></div>
+      </div>
+
     </main>
   </div>
 </div>
 
 <!-- MODALS -->
+<div class="modal-ov" id="ann-modal">
+  <div class="modal">
+    <div class="modal-t">📢 Announcement</div>
+    <p class="modal-s" id="ann-modal-sub">From the executive team.</p>
+    <div id="ann-modal-body"></div>
+    <div class="modal-ft"><button class="btn btn-primary" onclick="closeModal('ann-modal')">Got it</button></div>
+  </div>
+</div>
 <div class="modal-ov" id="staff-modal">
   <div class="modal">
     <div class="modal-t">Add Staff Account</div>
@@ -805,7 +837,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v26';
+const APP_VERSION='v27';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1218,6 +1250,7 @@ async function doLogin(){
 }
 function logout(){
   session={user:null,role:null};editingId=null;
+  annShown=false;lbData=null;   // next login sees its announcements again
   document.getElementById('screen-app').classList.remove('active');
   document.getElementById('screen-login').classList.add('active');
   ['l-username','l-password','lm-username','lm-password','l-execcode'].forEach(id=>document.getElementById(id).value='');
@@ -1238,6 +1271,7 @@ function launchApp(){
   else if(role==='manager'){renderMgrDash();document.getElementById('page-mgr-dash').classList.add('active');document.querySelector('#sb-manager .nav').classList.add('active');}
   else{renderExecDash();document.getElementById('page-exec-dash').classList.add('active');document.querySelector('#sb-exec .nav').classList.add('active');}
   updateClock();updateBadges();
+  showAnnouncementsOnLogin();   // once per login, before the dashboard is used
 }
 
 function gp(id,el){
@@ -1274,6 +1308,8 @@ function gp(id,el){
     'exec-managers':renderManagerTable,
     'exec-reports':renderExecReports,
     'exec-clients-mgmt':()=>renderClientsOnboarding('exec-clients-onboard'),
+    'announcements':renderAnnouncements,
+    'leaderboard':loadLeaderboard,
   };
   if(r[id])r[id]();
 }
@@ -2670,6 +2706,9 @@ function updateBadges(){
   const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
   const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
   const bER=document.getElementById('b-exec-reports');if(bER)bER.textContent=(DB.reports||[]).length;
+  // One badge per sidebar, so it is addressed by class rather than id.
+  const annCount=((DB.announcements)||[]).filter(a=>a.active).length;
+  document.querySelectorAll('.b-ann').forEach(b=>{b.textContent=annCount||'';b.style.display=annCount?'':'none';});
   // Task badges: staff = tasks assigned to me & not done; assigner = created by me & not done.
   const tasks=DB.tasks||[];
   const myTasks=myId&&session.role==='staff'?tasks.filter(t=>String(t.assignedTo)===String(myId)&&!t.done).length:0;
@@ -2913,6 +2952,238 @@ async function deleteReport(id){
   if(!confirm('Delete this weekly report permanently?'))return;
   try {await api('deleteReport',{id});await syncAll();renderExecReports();toast('Report deleted.');}
   catch(e){toast('Delete failed: '+e.message,'err');}
+}
+
+// ════════════════════════════════════════
+//  ANNOUNCEMENTS
+// ════════════════════════════════════════
+// `active` and `expired` are computed server-side. The 10:00 go-live and the
+// 24-hour expiry are the backend's job — never recalculated here.
+// "Already shown" lives in memory only, so it resets on a real login and is
+// never persisted to storage.
+let annShown=false;
+
+const ANN_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const ANN_DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+// Times arrive as UTC ISO strings; staff read them in Dubai time.
+function annWhen(iso){
+  const d=new Date(iso);if(isNaN(d.getTime()))return '';
+  const u=new Date(d.getTime()+4*3600*1000);
+  return `${ANN_DAYS[u.getUTCDay()]} ${u.getUTCDate()} ${ANN_MONTHS[u.getUTCMonth()]}, ${pad(u.getUTCHours())}:${pad(u.getUTCMinutes())}`;
+}
+function annsSorted(list){return [...(list||[])].sort((a,b)=>String(b.postedAt).localeCompare(String(a.postedAt)));}
+function activeAnns(){return annsSorted((DB&&DB.announcements)||[]).filter(a=>a.active);}
+
+function showAnnouncementsOnLogin(){
+  if(annShown)return;
+  annShown=true;
+  const list=activeAnns();
+  if(!list.length)return;                       // never an empty modal
+  document.getElementById('ann-modal-sub').textContent=
+    list.length>1?`${list.length} notices from the executive team.`:'From the executive team.';
+  // More than one active: stacked in a single modal, newest first.
+  document.getElementById('ann-modal-body').innerHTML=list.map(a=>`
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-weight:800;font-size:15px;margin-bottom:6px">${escapeHtml(a.title)}</div>
+      <div style="font-size:13px;line-height:1.6;white-space:pre-wrap">${escapeHtml(a.body)}</div>
+      <div style="font-size:11px;color:var(--ink3);margin-top:10px">Posted by ${escapeHtml(a.postedByName||'Executive')} · ${annWhen(a.postedAt)}</div>
+    </div>`).join('');
+  document.getElementById('ann-modal').classList.add('show');
+}
+
+function annCard(a,canDelete,badge){
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+      <div style="min-width:0">
+        <div style="font-weight:800;font-size:15px">${escapeHtml(a.title)}</div>
+        ${badge?`<div style="font-size:11px;color:var(--amber);margin-top:4px">${badge}</div>`:''}
+      </div>
+      ${canDelete?`<button class="btn btn-danger btn-sm" onclick="removeAnnouncement('${a.id}')">✕ Delete</button>`:''}
+    </div>
+    <div style="font-size:13px;line-height:1.6;white-space:pre-wrap;margin-top:8px">${escapeHtml(a.body)}</div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:10px">Posted by ${escapeHtml(a.postedByName||'Executive')} · ${annWhen(a.postedAt)}</div>
+  </div>`;
+}
+
+function renderAnnouncements(){
+  const wrap=document.getElementById('ann-wrap');if(!wrap)return;
+  const all=annsSorted((DB&&DB.announcements)||[]);
+  const isExec=session.role==='exec';
+  const sub=document.getElementById('ann-sub');
+  if(sub)sub.textContent=isExec
+    ?'Post notices for the team. Each one goes live at 10:00 on the next working day and stays up for 24 hours.'
+    :'Notices from the executive team.';
+
+  // Staff and managers only ever see what is live right now.
+  if(!isExec){
+    const act=all.filter(a=>a.active);
+    wrap.innerHTML=act.length?act.map(a=>annCard(a,false)).join(''):emptyState('📢','No announcements right now.');
+    return;
+  }
+
+  const live=all.filter(a=>a.active);
+  const scheduled=all.filter(a=>!a.active&&!a.expired);
+  const expired=all.filter(a=>a.expired);
+  const group=(label,items,badgeFn)=>`<div style="margin-top:1.5rem">
+    <div class="ct">${label} (${items.length})</div>
+    ${items.length?items.map(a=>annCard(a,true,badgeFn?badgeFn(a):'')).join('')
+                  :`<p style="font-size:13px;color:var(--ink3)">None.</p>`}
+  </div>`;
+
+  wrap.innerHTML=`<div class="card">
+      <div class="ct">＋ Post an announcement</div>
+      <div class="f full"><label>Title</label><input id="ann-title" placeholder="e.g. Office closed Thursday"/></div>
+      <div class="f full"><label>Message</label><textarea id="ann-body" style="min-height:90px" placeholder="What the team needs to know..."></textarea></div>
+      <button class="btn btn-primary btn-sm" onclick="postAnnouncement()">📢 Post</button>
+      <p id="ann-err" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></p>
+      <p style="font-size:12px;color:var(--ink3);margin-top:10px" id="ann-note">Announcements go live at 10:00 on the next working day and stay visible for 24 hours.</p>
+    </div>`
+    +group('🟢 Live now',live)
+    +group('🕐 Scheduled',scheduled,a=>`Goes live ${annWhen(a.showFrom)}`)
+    +group('⚪ Expired',expired);
+}
+
+async function postAnnouncement(){
+  const title=document.getElementById('ann-title').value.trim();
+  const body=document.getElementById('ann-body').value.trim();
+  const err=document.getElementById('ann-err');err.style.display='none';
+  if(!title){err.textContent='Enter a title.';err.style.display='block';return;}
+  if(!body){err.textContent='Enter the message.';err.style.display='block';return;}
+  try{
+    const res=await api('addAnnouncement',{title,body,
+      postedById:session.user.id||'exec',postedByName:session.user.name||'Executive'});
+    await syncAll();                         // re-renders this page via gp()
+    // Report back the window the BACKEND chose, not one guessed here.
+    const from=res&&res.showFrom?annWhen(res.showFrom):'';
+    const until=res&&res.showUntil?annWhen(res.showUntil):'';
+    const n=document.getElementById('ann-note');
+    if(n&&from)n.innerHTML=`<strong style="color:var(--green)">Posted.</strong> This will appear to staff on <strong>${from}</strong> and stay up for 24 hours${until?`, until ${until}`:''}.`;
+    toast('Announcement posted.','ok');
+  }catch(e){
+    const e2=document.getElementById('ann-err');
+    if(e2){e2.textContent='Could not post: '+e.message;e2.style.display='block';}
+    toast('Could not post the announcement.','err');
+  }
+}
+
+async function removeAnnouncement(id){
+  if(!confirm('Delete this announcement permanently?'))return;
+  try{await api('deleteAnnouncement',{id});await syncAll();toast('Announcement deleted.','ok');}
+  catch(e){toast('Delete failed: '+e.message,'err');}
+}
+
+// ════════════════════════════════════════
+//  LEADERBOARD
+// ════════════════════════════════════════
+// Rows arrive already sorted and ranked — never re-sorted or re-ranked here.
+let lbData=null;
+
+async function loadLeaderboard(){
+  const wrap=document.getElementById('lb-wrap');if(!wrap)return;
+  const sel=document.getElementById('lb-month');
+  if(sel&&!sel.value)sel.value=todayStr().slice(0,7);
+  const month=sel?sel.value:'';
+  wrap.innerHTML=`<div class="card"><p style="font-size:13px;color:var(--ink3)">Loading leaderboard…</p></div>`;
+  try{
+    lbData=await api('getLeaderboard',month?{month}:{});
+    renderLeaderboard();
+  }catch(e){
+    wrap.innerHTML=`<div class="card">
+      <p style="font-size:13px;color:var(--red)">Could not load the leaderboard: ${escapeHtml(e.message)}</p>
+      <button class="btn btn-sm" style="margin-top:10px" onclick="loadLeaderboard()">Try again</button></div>`;
+  }
+}
+
+function lbBar(label,val,color){
+  const v=Math.max(0,Math.min(100,parseFloat(val)||0));
+  return `<div style="flex:1;min-width:92px">
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink3);margin-bottom:3px">
+      <span>${label}</span><span style="font-family:var(--font)">${v.toFixed(0)}</span></div>
+    <div style="height:5px;background:var(--s2);border-radius:3px;overflow:hidden">
+      <div style="height:100%;width:${v}%;background:${color}"></div></div>
+  </div>`;
+}
+
+function renderLeaderboard(){
+  const wrap=document.getElementById('lb-wrap');if(!wrap||!lbData)return;
+  const w=lbData.weights||{attendance:40,compliance:30,management:30};
+  const rows=lbData.rows||[];
+  const meId=session.role==='staff'&&session.user?String(session.user.id):null;
+  const medal=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':'';
+
+  const list=rows.length?rows.map(r=>{
+    const mine=meId&&String(r.staffId)===meId;
+    return `<div class="card" style="margin-bottom:10px;${mine?'border-color:var(--accent);background:var(--s2)':''}">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div style="font-family:var(--font);font-size:20px;font-weight:800;min-width:34px;color:var(--ink3)">${r.rank}</div>
+        <div style="flex:1;min-width:130px">
+          <div style="font-weight:700">${medal(r.rank)} ${escapeHtml(r.staffName)}${mine?' <span class="tag tag-mgr">You</span>':''}</div>
+          <div style="font-size:11px;color:var(--ink3);margin-top:2px">${r.daysPresent} days present · ${r.entriesLogged} entries logged</div>
+        </div>
+        <div style="font-family:var(--font);font-size:24px;font-weight:800;letter-spacing:-.04em">${(parseFloat(r.total)||0).toFixed(1)}</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+        ${lbBar('Attendance',r.attendance,'var(--accent)')}
+        ${lbBar('Compliance',r.compliance,'var(--green)')}
+        ${lbBar('Management',r.management,'var(--purple)')}
+      </div>
+    </div>`;
+  }).join(''):emptyState('🏆','No leaderboard data for this month yet.');
+
+  // Always visible, never behind a tooltip: a public ranking needs its rules
+  // on the page. Percentages come from the response, not hardcoded.
+  const note=`<div class="card" style="margin-top:1rem">
+    <div class="ct">How your score works</div>
+    <p style="font-size:13px;line-height:1.8;color:var(--ink2);margin:0">
+      Your score combines three things:<br>
+      <strong>Attendance (${w.attendance}%)</strong> — days you checked in, out of working days so far this month.<br>
+      <strong>Entry compliance (${w.compliance}%)</strong> — work log entries submitted, out of those expected. A late entry counts as half.<br>
+      <strong>Management score (${w.management}%)</strong> — set each month by the executive.
+    </p>
+    <p style="font-size:11px;color:var(--ink3);margin-top:12px">${lbData.month} · ${lbData.workingDays} working days so far · ${lbData.expectedEntries} entries expected.</p>
+  </div>`;
+
+  wrap.innerHTML=list+note+(session.role==='exec'?lbMgmtForm():'');
+}
+
+function lbMgmtForm(){
+  const byId={};(lbData.rows||[]).forEach(r=>byId[String(r.staffId)]=r);
+  return `<div class="card" style="margin-top:1rem">
+    <div class="ct">Management score — ${lbData.month}</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:1.25rem">0–100 for each staff member. Saving again for the same month overwrites the previous value.</p>
+    ${(DB.staff||[]).map(s=>{
+      const cur=byId[String(s.id)];
+      return `<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:140px"><label>${escapeHtml(s.name)}</label>
+          <input type="number" min="0" max="100" step="1" id="ms-${s.id}" value="${cur?(parseFloat(cur.management)||0):0}"/></div>
+        <div style="flex:2;min-width:190px"><label>Note (optional)</label>
+          <input id="mn-${s.id}" placeholder="Why this score…"/></div>
+        <button class="btn btn-primary btn-sm" onclick="saveMgmtScore('${s.id}')">Save</button>
+      </div>`;
+    }).join('')}
+    <p id="ms-err" style="display:none;color:var(--red);font-size:12px"></p>
+  </div>`;
+}
+
+async function saveMgmtScore(staffId){
+  const s=(DB.staff||[]).find(x=>String(x.id)===String(staffId));
+  if(!s)return;
+  const err=document.getElementById('ms-err');if(err)err.style.display='none';
+  const score=parseFloat(document.getElementById('ms-'+staffId).value);
+  const note=document.getElementById('mn-'+staffId).value.trim();
+  if(isNaN(score)||score<0||score>100){
+    if(err){err.textContent=`${s.name}: the score must be a number between 0 and 100.`;err.style.display='block';}
+    return;
+  }
+  try{
+    await api('setMgmtScore',{month:lbData.month,staffId:s.id,staffName:s.name,score,note,
+      setBy:session.user.name||'Executive'});
+    toast(`${s.name}: management score saved.`,'ok');
+    await loadLeaderboard();
+  }catch(e){
+    if(err){err.textContent='Could not save: '+e.message;err.style.display='block';}
+    toast('Could not save the score.','err');
+  }
 }
 
 function emptyState(icon,msg){return`<div style="text-align:center;padding:4rem 2rem;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">${icon}</div><p style="font-size:14px">${msg}</p></div>`;}
