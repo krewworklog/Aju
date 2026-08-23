@@ -88,6 +88,7 @@ textarea{resize:vertical;line-height:1.6;}
 .chip-staff{background:var(--accent-g);color:var(--accent);}
 .chip-manager{background:var(--green-b);color:var(--green);}
 .chip-exec{background:var(--purple-b);color:var(--purple);}
+.chip-hr{background:var(--amber-b);color:var(--amber);}
 .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
 .sync-dot.syncing{background:var(--amber);animation:p 1s infinite;}
 .sync-dot.error{background:var(--red);}
@@ -107,6 +108,7 @@ textarea{resize:vertical;line-height:1.6;}
 .av-staff{background:var(--accent-g);color:var(--accent);}
 .av-manager{background:var(--green-b);color:var(--green);}
 .av-exec{background:var(--purple-b);color:var(--purple);}
+.av-hr{background:var(--amber-b);color:var(--amber);}
 
 .app-body{display:flex;flex:1;}
 .sidebar{width:216px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--border);padding:.875rem .75rem;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto;}
@@ -281,6 +283,7 @@ textarea{resize:vertical;line-height:1.6;}
       <button class="tab-btn active" onclick="setLoginRole('staff',this)">Staff</button>
       <button class="tab-btn" onclick="setLoginRole('manager',this)">Manager</button>
       <button class="tab-btn" onclick="setLoginRole('exec',this)">Executive</button>
+      <button class="tab-btn" onclick="setLoginRole('hr',this)">HR</button>
     </div>
     <div id="login-staff">
       <div class="lf"><label>Username</label><input id="l-username" placeholder="Enter your username" autocomplete="username"/></div>
@@ -292,6 +295,9 @@ textarea{resize:vertical;line-height:1.6;}
     </div>
     <div id="login-exec" style="display:none">
       <div class="lf"><label>Executive Password</label><input type="password" id="l-execcode" placeholder="Enter executive password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+    </div>
+    <div id="login-hr" style="display:none">
+      <div class="lf"><label>HR Password</label><input type="password" id="l-hrcode" placeholder="Enter HR password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
     </div>
     <div class="login-err" id="l-err">Incorrect credentials. Please try again.</div>
     <button class="btn btn-primary btn-full" style="margin-top:.75rem" onclick="doLogin()">Sign In →</button>
@@ -376,6 +382,12 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-managers',this)"><span class="nav-ic">🛡</span>Manager Accounts</div>
         <div class="nav" onclick="gp('exec-clients-mgmt',this)"><span class="nav-ic">🏢</span>Clients</div>
         <div class="nav" onclick="gp('exec-passwd',this)"><span class="nav-ic">🔑</span>Executive Password</div>
+        <div class="nav" onclick="gp('exec-hr',this)"><span class="nav-ic">🧾</span>HR Access</div>
+      </div>
+      <!-- HR sees the salary report and nothing else. -->
+      <div id="sb-hr" style="display:none">
+        <div class="sbl">Payroll</div>
+        <div class="nav active" onclick="gp('exec-salary',this)"><span class="nav-ic">💰</span>Salary Report</div>
       </div>
     </aside>
 
@@ -676,6 +688,20 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="exec-tasks-list"></div>
       </div>
 
+      <!-- EXEC: HR ACCESS -->
+      <div class="page" id="page-exec-hr">
+        <div class="ph"><div><div class="pt">HR Access</div><p class="ps">HR signs in with its own password and sees only the salary report — no logs, attendance, tasks or staff accounts.</p></div></div>
+        <div class="card"><div class="ct">HR Password</div>
+          <p style="font-size:12px;color:var(--ink3);margin-bottom:1rem" id="hr-state"></p>
+          <div class="fg">
+            <div class="f"><label>New HR Password *</label><input type="password" id="hp-new"/></div>
+            <div class="f"><label>Confirm New *</label><input type="password" id="hp-con"/></div>
+          </div>
+          <div class="ferr" id="hp-err" style="display:block;margin-top:8px"></div>
+          <button class="btn btn-ghost" style="margin-top:14px" onclick="changeHrCode()">Set HR Password</button>
+        </div>
+      </div>
+
       <!-- ANNOUNCEMENTS (all roles) -->
       <div class="page" id="page-announcements">
         <div class="ph"><div><div class="pt">Announcements</div><p class="ps" id="ann-sub">Notices from the executive team.</p></div></div>
@@ -837,7 +863,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v29';
+const APP_VERSION='v30';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1222,6 +1248,7 @@ function setLoginRole(role,el){
   document.getElementById('login-staff').style.display=role==='staff'?'block':'none';
   document.getElementById('login-manager').style.display=role==='manager'?'block':'none';
   document.getElementById('login-exec').style.display=role==='exec'?'block':'none';
+  document.getElementById('login-hr').style.display=role==='hr'?'block':'none';
 }
 async function doLogin(){
   const err=document.getElementById('l-err');err.style.display='none';
@@ -1250,8 +1277,18 @@ async function doLogin(){
     const a=DB.managers.find(a=>String(a.username).toLowerCase()===u.toLowerCase()&&String(a.password)===p);
     if(!a){err.style.display='block';return;}
     session={user:a,role:'manager'};
+  }else if(loginRole==='hr'){
+    // HR signs in with its own password, kept in the config tab alongside the
+    // executive one. Until an executive sets it, HR cannot sign in at all.
+    const code=String((DB.config&&DB.config.hrCode)||'').trim();
+    if(!code){
+      err.textContent='No HR password has been set yet — ask the executive to set one under Settings → HR Access.';
+      err.style.display='block';return;
+    }
+    if(document.getElementById('l-hrcode').value.trim()!==code){err.textContent='Incorrect credentials. Please try again.';err.style.display='block';return;}
+    session={user:{name:'HR',username:'hr',id:'hr'},role:'hr'};
   }else{
-    if(document.getElementById('l-execcode').value.trim()!==String(DB.execCode)){err.style.display='block';return;}
+    if(document.getElementById('l-execcode').value.trim()!==String(DB.execCode)){err.textContent='Incorrect credentials. Please try again.';err.style.display='block';return;}
     session={user:{name:'Executive',username:'exec',id:'exec'},role:'exec'};
   }
   launchApp();
@@ -1261,7 +1298,7 @@ function logout(){
   annShown=false;lbData=null;   // next login sees its announcements again
   document.getElementById('screen-app').classList.remove('active');
   document.getElementById('screen-login').classList.add('active');
-  ['l-username','l-password','lm-username','lm-password','l-execcode'].forEach(id=>document.getElementById(id).value='');
+  ['l-username','l-password','lm-username','lm-password','l-execcode','l-hrcode'].forEach(id=>document.getElementById(id).value='');
 }
 function launchApp(){
   document.getElementById('screen-login').classList.remove('active');
@@ -1271,12 +1308,13 @@ function launchApp(){
   const av=document.getElementById('top-av');av.textContent=initials;av.className='avatar av-'+role;
   document.getElementById('top-name').textContent=name;
   const rc=document.getElementById('role-chip');rc.className='role-chip chip-'+role;rc.textContent=role.charAt(0).toUpperCase()+role.slice(1);
-  ['sb-staff','sb-manager','sb-exec'].forEach(id=>document.getElementById(id).style.display='none');
+  ['sb-staff','sb-manager','sb-exec','sb-hr'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('sb-'+role).style.display='block';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
   if(role==='staff'){initLogForm();document.getElementById('page-log').classList.add('active');document.querySelector('#sb-staff .nav').classList.add('active');}
   else if(role==='manager'){renderMgrDash();document.getElementById('page-mgr-dash').classList.add('active');document.querySelector('#sb-manager .nav').classList.add('active');}
+  else if(role==='hr'){renderExecSalary();document.getElementById('page-exec-salary').classList.add('active');document.querySelector('#sb-hr .nav').classList.add('active');}
   else{renderExecDash();document.getElementById('page-exec-dash').classList.add('active');document.querySelector('#sb-exec .nav').classList.add('active');}
   updateClock();updateBadges();
   showAnnouncementsOnLogin();   // once per login, before the dashboard is used
@@ -1316,6 +1354,7 @@ function gp(id,el){
     'exec-managers':renderManagerTable,
     'exec-reports':renderExecReports,
     'exec-clients-mgmt':()=>renderClientsOnboarding('exec-clients-onboard'),
+    'exec-hr':renderHrAccess,
     'announcements':renderAnnouncements,
     'leaderboard':loadLeaderboard,
   };
@@ -2454,6 +2493,31 @@ async function changeExecCode(){
     ['ep-cur','ep-new','ep-con'].forEach(id=>document.getElementById(id).value='');
     toast('Password updated.','ok');
   } catch(e){err.textContent='Update failed: '+e.message;err.style.display='block';}
+}
+
+// HR password lives in the config tab under `hrCode`, written through the
+// existing setConfigKey action — no backend change was needed for this.
+function renderHrAccess(){
+  const st=document.getElementById('hr-state');if(!st)return;
+  const set=String((DB.config&&DB.config.hrCode)||'').trim();
+  st.innerHTML=set
+    ?'An HR password is set. Entering a new one replaces it immediately.'
+    :'<strong style="color:var(--amber)">No HR password set yet</strong> — HR cannot sign in until you set one here.';
+  ['hp-new','hp-con'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const err=document.getElementById('hp-err');if(err)err.style.display='none';
+}
+async function changeHrCode(){
+  const nw=document.getElementById('hp-new').value.trim();
+  const con=document.getElementById('hp-con').value.trim();
+  const err=document.getElementById('hp-err');err.style.display='none';
+  if(!nw){err.textContent='New password empty.';err.style.display='block';return;}
+  if(nw!==con){err.textContent='Passwords do not match.';err.style.display='block';return;}
+  try{
+    await api('setConfigKey',{key:'hrCode',value:nw});
+    await syncAll();
+    renderHrAccess();
+    toast('HR password set.','ok');
+  }catch(e){err.textContent='Update failed: '+e.message;err.style.display='block';}
 }
 
 function generateCodeString(){
