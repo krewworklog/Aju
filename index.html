@@ -837,7 +837,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v28';
+const APP_VERSION='v29';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -996,9 +996,17 @@ function attnPresentHours(a){
   if(!a)return 0;
   const w=officeWindow(a.date); if(!w)return 0;
   const i=parseHM(a.checkIn),o=parseHM(a.checkOut);
-  if(i==null||o==null)return 0;
+  if(i==null)return 0;                       // never checked in — absent
+  // Checked in but no check-out. That is almost always a forgotten tap on the
+  // way out, not a missing day, so it costs half a day rather than all of it.
+  if(o==null)return (w.end-w.start)/60/2;
   const eff=Math.min(o,w.end)-Math.max(i,w.start);
   return Math.max(0,eff)/60;
+}
+// True when the day was worked but the check-out was never recorded, so the
+// salary view can say why half a day is missing instead of leaving a mystery.
+function attnMissingCheckout(a){
+  return !!(a&&parseHM(a.checkIn)!=null&&parseHM(a.checkOut)==null&&officeWindow(a.date));
 }
 // Minutes late arriving / leaving early, for the day's official window.
 function attnLateBy(a){ if(!a)return 0; const w=officeWindow(a.date); const i=parseHM(a.checkIn); return (w&&i!=null&&i>w.start)?i-w.start:0; }
@@ -1836,16 +1844,16 @@ function attnMonthlyForStaff(s,days){
 // the Attendance report deliberately still shows real hours, because the grace
 // is a payroll decision, not a claim about who was actually in the office.
 function attnMonthlyForSalary(s,days){
-  let exp=0,pres=0,graced=0;
+  let exp=0,pres=0,graced=0,halfDays=0;
   days.forEach(date=>{
     if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
     const eh=expectedHoursForDay(date);
     exp+=eh;
     if(date<=GRACE_UNTIL){pres+=eh;graced++;return;}
     const a=attnFor(s.id,date);
-    if(a)pres+=attnPresentHours(a);
+    if(a){pres+=attnPresentHours(a);if(attnMissingCheckout(a))halfDays++;}
   });
-  return {exp,pres,graced};
+  return {exp,pres,graced,halfDays};
 }
 function salaryDays(month,countEnd){
   const days=[];let cur=month+'-01';
@@ -2201,7 +2209,7 @@ function renderMySalary(){
     <div class="ct">💰 ${escapeHtml(me.name)} — ${month}</div>
     <table style="width:100%;border-collapse:collapse">
       ${row('Base salary',r.base.toLocaleString()+' AED')}
-      ${row('Attendance','× '+Math.round(r.attFactor*100)+'%',`${r.att.pres.toFixed(1)} of ${r.att.exp.toFixed(1)} hours${r.att.graced?` · ${r.att.graced} day${r.att.graced===1?'':'s'} credited in full up to ${GRACE_UNTIL}`:''}`)}
+      ${row('Attendance','× '+Math.round(r.attFactor*100)+'%',`${r.att.pres.toFixed(1)} of ${r.att.exp.toFixed(1)} hours${r.att.graced?` · ${r.att.graced} day${r.att.graced===1?'':'s'} credited in full up to ${GRACE_UNTIL}`:''}${r.att.halfDays?` · ${r.att.halfDays} day${r.att.halfDays===1?'':'s'} counted as half — no check-out recorded`:''}`)}
       ${row('Pay after attendance',r.attPay.toLocaleString()+' AED')}
       ${row('Missed entries',r.missedSlots+' slot'+(r.missedSlots===1?'':'s'),r.cutsActive?`${ENTRY_CUT} AED each · only counted after ${GRACE_UNTIL}`:'no entry cut this month')}
       ${row('Entry deduction',r.entryCut?'− '+r.entryCut.toLocaleString()+' AED':'0',null,r.entryCut?'var(--red)':'var(--ink3)')}
@@ -2241,6 +2249,7 @@ function renderExecSalary(){
   if(!cutsActive)notes.push('Entry deductions (20 AED each) apply from August 2026 — this month shows missed counts only, with no entry cut.');
   if(!monthOver)notes.push(`Month still in progress — the ${TARGET_CUT_PCT}% target cut only applies if the goal is still unmet at month end.`);
   if(month===GRACE_UNTIL.slice(0,7))notes.push(`Every working day up to and including ${GRACE_UNTIL} is paid as a full day with no missed-entry cut, because check-outs were being lost until the fix on 20 Aug. Normal rules apply from the next working day.`);
+  if(attnActive)notes.push('A day with a check-in but no check-out counts as half a day, not a lost day — forgetting the evening tap costs half, never the whole day.');
   notes.push(`Onboarding: mark Yes once a staff member has completed onboarding for all their clients. An explicit No applies the ${ONBOARD_CUT_PCT}% cut straight away; left unmarked it only applies once the month has closed.`);
   banner.innerHTML=notes.length?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>ℹ️</span><span>${notes.join(' ')}</span></div>`:'';
   const rows=DB.staff.map(s=>salaryRowFor(s,month,days,monthOver));
