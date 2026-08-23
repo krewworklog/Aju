@@ -1,17 +1,3 @@
-/* ⚠️  STALE — DO NOT PASTE THIS FILE INTO APPS SCRIPT  ⚠️
-   ══════════════════════════════════════════════════════════════
-   This copy is CODE_VERSION v21-dedupe-guard.
-   The LIVE backend is v22-announcements-leaderboard, which adds
-   announcements, the leaderboard and management scores. That code
-   was written directly in the Apps Script editor and was never
-   committed here, so this file does NOT contain it.
-
-   Pasting this file over the live project would DELETE
-   announcements, the leaderboard and setMgmtScore.
-
-   Before using this file for anything, copy the current code OUT of
-   the Apps Script editor and into this file first.
-   ══════════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════════
    ██  KREW  MARKETING  —  WorkLog  backend
    ██  PASTE THIS ONLY INTO THE SCRIPT BOUND TO:  "worklog database"
@@ -19,13 +5,12 @@
    ██  DO NOT paste into the Al Rasa project.
    ═══════════════════════════════════════════════════════════════ */
 /**
- * WorkLog — Google Sheets Backend (v9 — entry proof screenshots + manager reviews)
- * Deploy as Web App: Execute as "Me", Access "Anyone"
+ * WorkLog — Google Sheets Backend
  *
- * v8 added Tasks (with photo upload to Drive); v9 adds:
- *  - addEntry/updateEntry accept a `proofs` param: [{i, imageData, imageType}]
- *    Each image is saved to Drive and its URL stored as rows[i].proofImg.
- *  - reviewEntry action: manager approval/rejection stored inside rows[0]._review.
+ * v9  — entry proof screenshots + manager reviews
+ * v10 — proof auto-cleanup (7 days), announcements, leaderboard
+ *
+ * Deploy as Web App: Execute as "Me", Access "Anyone"
  */
 
 const SHEETS = {
@@ -46,10 +31,14 @@ const SHEETS = {
   incWork:     ['id', 'month', 'staffId', 'staffName', 'client', 'service', 'done', 'doneAt', 'note'],
   // Monthly PDF report, due by the 5th of the following month
   incReports:  ['id', 'month', 'staffId', 'staffName', 'fileUrl', 'fileName', 'submittedAt', 'onTime'],
+  // v10 — HR / executive announcements
+  announcements: ['id', 'title', 'body', 'postedById', 'postedByName', 'postedAt', 'showFrom', 'showUntil'],
+  // v10 — executive management score for the leaderboard
+  mgmtScores:  ['id', 'month', 'staffId', 'staffName', 'score', 'note', 'setBy', 'setAt'],
   config:   ['key', 'value']
 };
 
-const CODE_VERSION = 'v21-dedupe-guard';
+const CODE_VERSION = 'v22-announcements-leaderboard';
 
 const DEFAULT_CLIENTS = ['Baaqat Flowers','Flovia Flowers','8th Cafe','Florens Flowers','Flat Chocolate','Al Rasa','Fedora Perfumes','Elite Party','Hair Salon'];
 const DEFAULT_EXEC_CODE = '99999';
@@ -143,6 +132,11 @@ function handleRequest(e) {
       case 'setIncWork':   result = setIncWork(ss, params); break;
       case 'submitIncReport': result = submitIncReport(ss, params); break;
       case 'setConfigKey': result = setConfig(ss, params.key, params.value); break;
+      // ---- v10: announcements + leaderboard ----
+      case 'addAnnouncement':    result = addAnnouncement(ss, params); break;
+      case 'deleteAnnouncement': result = deleteRow(ss, 'announcements', params.id); break;
+      case 'setMgmtScore':       result = setMgmtScore(ss, params); break;
+      case 'getLeaderboard':     result = getLeaderboard(ss, params.month); break;
       default: result = { error: 'Unknown action' };
     }
     return jsonResponse(result);
@@ -287,8 +281,10 @@ function getAll(ss) {
     ...r, submittedAt: dateCellToString(r.submittedAt, tz),
     onTime: r.onTime === true || r.onTime === 'TRUE' || r.onTime === 'true'
   }));
+  // ---- v10: announcements ----
+  const announcements = getAnnouncements(ss);
   return { staff, managers, clients, clientServices, entries, codes, reports, tasks, leads, attendance,
-           incMembers, deliverables, incWork, incReports,
+           incMembers, deliverables, incWork, incReports, announcements,
            config: configMap, codeVersion: CODE_VERSION, execCode: String(execCode) };
 }
 
@@ -881,4 +877,335 @@ function ensureMonthlyReportTasks(ss) {
   cell.setNumberFormat('@');
   cell.setValue(month);
   cache.put('rptTasks_' + month, '1', 21600);
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  AUTO-DELETE ENTRY PROOFS (v10)
+//  Proof images are deleted from Drive 7 days after the entry's date.
+//  The Sheet row is kept; rows[i].proofImg is cleared and a
+//  proofDeletedAt note is added.
+//  Run installProofCleanupTrigger() ONCE from the editor to schedule.
+// ══════════════════════════════════════════════════════════════
+
+const PROOF_RETENTION_DAYS = 7;
+
+function installProofCleanupTrigger() {
+  // Remove any existing trigger for this function first, so re-running
+  // this doesn't create duplicates.
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'cleanupOldProofs') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('cleanupOldProofs')
+    .timeBased()
+    .everyDays(1)
+    .atHour(3)
+    .create();
+  return 'Daily proof-cleanup trigger installed.';
+}
+
+// Pulls the Drive file ID out of the URL format saveImageToDrive() produces:
+// https://drive.google.com/uc?export=view&id=FILE_ID
+function driveIdFromProofUrl(url) {
+  const m = String(url || '').match(/[?&]id=([^&]+)/);
+  return m ? m[1] : null;
+}
+
+function cleanupOldProofs() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  assertRightSpreadsheet(ss);
+  const sh = ss.getSheetByName('entries');
+  const headers = sheetHeaders(sh, 'entries');
+  const tz = ss.getSpreadsheetTimeZone();
+  const rowsIdx = headers.indexOf('rows');
+  const dateIdx = headers.indexOf('date');
+  if (rowsIdx < 0) return;
+
+  const data = sh.getDataRange().getValues();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - PROOF_RETENTION_DAYS);
+
+  let deletedCount = 0;
+  const logSh = ensureProofLogSheet(ss);
+
+  for (let i = 1; i < data.length; i++) {
+    const entryDateRaw = dateCellToString(data[i][dateIdx], tz);
+    const entryDate = new Date(entryDateRaw);
+    if (isNaN(entryDate.getTime()) || entryDate >= cutoff) continue;
+
+    let rows = [];
+    try { rows = data[i][rowsIdx] ? JSON.parse(data[i][rowsIdx]) : []; } catch (e) { continue; }
+    if (!rows.length) continue;
+
+    let changed = false;
+    const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    rows.forEach(r => {
+      if (r && r.proofImg) {
+        const fileId = driveIdFromProofUrl(r.proofImg);
+        if (fileId) {
+          try {
+            DriveApp.getFileById(fileId).setTrashed(true);
+            logSh.appendRow([new Date().toISOString(), data[i][0], fileId, r.proofImg]);
+            deletedCount++;
+          } catch (e) {
+            // File already gone or inaccessible — still clear the reference.
+          }
+        }
+        r.proofImg = '';
+        r.proofDeletedAt = today;
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      sh.getRange(i + 1, rowsIdx + 1).setValue(JSON.stringify(rows));
+    }
+  }
+
+  return { ok: true, deleted: deletedCount };
+}
+
+function ensureProofLogSheet(ss) {
+  let sh = ss.getSheetByName('proofDeletionLog');
+  if (!sh) {
+    sh = ss.insertSheet('proofDeletionLog');
+    sh.getRange(1, 1, 1, 4).setValues([['deletedAt', 'entryId', 'driveFileId', 'oldUrl']]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  CONFIG HELPERS (v10)
+//  Override any of these by adding a row to the 'config' tab:
+//    offDay          0=Sunday, 1=Monday ... 6=Saturday   (default 0)
+//    wAttendance     weight for attendance    (default 40)
+//    wCompliance     weight for entry logs    (default 30)
+//    wManagement     weight for exec score    (default 30)
+//    entriesPerDay   expected entries per day (default 2)
+// ══════════════════════════════════════════════════════════════
+
+function cfgNum(ss, key, fallback) {
+  const sh = ss.getSheetByName('config');
+  if (!sh) return fallback;
+  const data = sh.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === key) {
+      const n = parseFloat(data[i][1]);
+      return isNaN(n) ? fallback : n;
+    }
+  }
+  return fallback;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  ANNOUNCEMENTS (v10)
+//  Posted by an executive. Goes live IMMEDIATELY and disappears
+//  exactly 24 hours later.
+// ══════════════════════════════════════════════════════════════
+
+// Kept for reference — no longer used now that announcements go live at once.
+function nextWorkingDay10(ss) {
+  const offDay = cfgNum(ss, 'offDay', 0);
+  const now = new Date();
+  const d = new Date();
+  d.setHours(10, 0, 0, 0);
+  if (now.getTime() >= d.getTime()) d.setDate(d.getDate() + 1);
+  let guard = 0;
+  while (d.getDay() === offDay && guard++ < 10) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+function addAnnouncement(ss, params) {
+  const sh = ss.getSheetByName('announcements');
+  const headers = sheetHeaders(sh, 'announcements');
+  const showFrom = new Date();                       // live the moment it is posted
+  const showUntil = new Date(showFrom.getTime() + 24 * 60 * 60 * 1000);
+
+  const obj = {
+    id: 'ann' + Date.now(),
+    title: params.title || '',
+    body: params.body || '',
+    postedById: params.postedById || '',
+    postedByName: params.postedByName || '',
+    postedAt: new Date().toISOString(),
+    showFrom: showFrom.toISOString(),
+    showUntil: showUntil.toISOString()
+  };
+
+  const r = sh.getLastRow() + 1;
+  headers.forEach((h, i) => {
+    sh.getRange(r, i + 1).setValue(obj[h] !== undefined ? obj[h] : '');
+  });
+  return { ok: true, showFrom: obj.showFrom, showUntil: obj.showUntil };
+}
+
+// Every announcement, flagged so the frontend can show staff only the
+// live one while execs also see what is scheduled and what has expired.
+function getAnnouncements(ss) {
+  const sh = ss.getSheetByName('announcements');
+  if (!sh) return [];
+  const now = new Date().getTime();
+  return sheetToObjects(sh).map(a => {
+    const from = new Date(a.showFrom).getTime();
+    const until = new Date(a.showUntil).getTime();
+    return {
+      ...a,
+      active: !isNaN(from) && !isNaN(until) && now >= from && now < until,
+      expired: !isNaN(until) && now >= until
+    };
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  MANAGEMENT SCORE (v10) — executive rates each staff member 0-100
+//  for a given month. One row per (month, staff); re-setting overwrites.
+// ══════════════════════════════════════════════════════════════
+
+function setMgmtScore(ss, params) {
+  const sh = ss.getSheetByName('mgmtScores');
+  const headers = sheetHeaders(sh, 'mgmtScores');
+  const col = h => headers.indexOf(h);
+  const score = Math.max(0, Math.min(100, parseFloat(params.score) || 0));
+  const data = sh.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][col('month')]) === String(params.month) &&
+        String(data[i][col('staffId')]) === String(params.staffId)) {
+      sh.getRange(i + 1, col('score') + 1).setValue(score);
+      sh.getRange(i + 1, col('note') + 1).setValue(params.note || '');
+      sh.getRange(i + 1, col('setBy') + 1).setValue(params.setBy || '');
+      sh.getRange(i + 1, col('setAt') + 1).setValue(new Date().toISOString());
+      return { ok: true, updated: true };
+    }
+  }
+
+  const obj = {
+    id: 'ms' + Date.now(),
+    month: params.month,
+    staffId: params.staffId,
+    staffName: params.staffName || '',
+    score: score,
+    note: params.note || '',
+    setBy: params.setBy || '',
+    setAt: new Date().toISOString()
+  };
+  const r = sh.getLastRow() + 1;
+  headers.forEach((h, i) => {
+    const cell = sh.getRange(r, i + 1);
+    if (h === 'month') cell.setNumberFormat('@');
+    cell.setValue(obj[h] !== undefined ? obj[h] : '');
+  });
+  return { ok: true, created: true };
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  LEADERBOARD (v10)
+//
+//    ATTENDANCE   days checked in / working days elapsed
+//    COMPLIANCE   entries submitted / expected entries
+//                 (an entry flagged late counts as half)
+//    MANAGEMENT   set by the executive, 0-100 (0 if unset)
+//
+//  Total = attendance*40% + compliance*30% + management*30%
+//  month format: "2026-08". Omit to use the current month.
+// ══════════════════════════════════════════════════════════════
+
+function getLeaderboard(ss, month) {
+  const tz = ss.getSpreadsheetTimeZone();
+  const m = month || Utilities.formatDate(new Date(), tz, 'yyyy-MM');
+  const offDay = cfgNum(ss, 'offDay', 0);
+  const wA = cfgNum(ss, 'wAttendance', 40);
+  const wC = cfgNum(ss, 'wCompliance', 30);
+  const wM = cfgNum(ss, 'wManagement', 30);
+  const perDay = cfgNum(ss, 'entriesPerDay', 2);
+  const wTotal = wA + wC + wM || 1;
+
+  // ---- working days elapsed so far this month ----
+  const y = parseInt(m.slice(0, 4), 10);
+  const mo = parseInt(m.slice(5, 7), 10);
+  const todayStr = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const isCurrentMonth = todayStr.slice(0, 7) === m;
+  const lastDayOfMonth = new Date(y, mo, 0).getDate();
+  const lastDay = isCurrentMonth ? parseInt(todayStr.slice(8, 10), 10) : lastDayOfMonth;
+
+  let workingDays = 0;
+  for (let d = 1; d <= lastDay; d++) {
+    if (new Date(y, mo - 1, d).getDay() !== offDay) workingDays++;
+  }
+  if (workingDays < 1) workingDays = 1;
+
+  // ---- raw data ----
+  const staff = sheetToObjects(ss.getSheetByName('staff'));
+
+  const attendance = sheetToObjects(ss.getSheetByName('attendance')).map(a => ({
+    staffId: String(a.staffId),
+    date: String(dateCellToString(a.date, tz)),
+    checkIn: a.checkIn
+  })).filter(a => a.date.slice(0, 7) === m && String(a.checkIn).trim() !== '');
+
+  const entries = sheetToObjects(ss.getSheetByName('entries')).map(e => ({
+    staffId: String(e.staffId),
+    date: String(dateCellToString(e.date, tz)),
+    late: e.late === true || e.late === 'TRUE' || e.late === 'true'
+  })).filter(e => e.date.slice(0, 7) === m);
+
+  const mgmt = {};
+  const scoreSh = ss.getSheetByName('mgmtScores');
+  if (scoreSh) {
+    sheetToObjects(scoreSh).forEach(s => {
+      if (String(s.month) === m) mgmt[String(s.staffId)] = parseFloat(s.score) || 0;
+    });
+  }
+
+  // ---- score each staff member ----
+  const rows = staff.map(s => {
+    const sid = String(s.id);
+
+    const days = {};
+    attendance.forEach(a => { if (a.staffId === sid) days[a.date] = 1; });
+    const daysPresent = Object.keys(days).length;
+    const attScore = Math.min(100, (daysPresent / workingDays) * 100);
+
+    let credit = 0, totalEntries = 0;
+    entries.forEach(e => {
+      if (e.staffId !== sid) return;
+      totalEntries++;
+      credit += e.late ? 0.5 : 1;
+    });
+    const expected = workingDays * perDay;
+    const compScore = Math.min(100, (credit / expected) * 100);
+
+    const mgmtScore = mgmt[sid] !== undefined ? mgmt[sid] : 0;
+    const total = (attScore * wA + compScore * wC + mgmtScore * wM) / wTotal;
+
+    return {
+      staffId: sid,
+      staffName: s.name,
+      attendance: Math.round(attScore * 10) / 10,
+      compliance: Math.round(compScore * 10) / 10,
+      management: Math.round(mgmtScore * 10) / 10,
+      total: Math.round(total * 10) / 10,
+      daysPresent: daysPresent,
+      entriesLogged: totalEntries
+    };
+  });
+
+  rows.sort((a, b) => b.total - a.total);
+  rows.forEach((r, i) => { r.rank = i + 1; });
+
+  return {
+    month: m,
+    workingDays: workingDays,
+    expectedEntries: workingDays * perDay,
+    weights: { attendance: wA, compliance: wC, management: wM },
+    rows: rows
+  };
 }
