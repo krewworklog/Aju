@@ -1,3 +1,17 @@
+/* ⚠️  STALE — DO NOT PASTE THIS FILE INTO APPS SCRIPT  ⚠️
+   ══════════════════════════════════════════════════════════════
+   This copy is CODE_VERSION v21-dedupe-guard.
+   The LIVE backend is v22-announcements-leaderboard, which adds
+   announcements, the leaderboard and management scores. That code
+   was written directly in the Apps Script editor and was never
+   committed here, so this file does NOT contain it.
+
+   Pasting this file over the live project would DELETE
+   announcements, the leaderboard and setMgmtScore.
+
+   Before using this file for anything, copy the current code OUT of
+   the Apps Script editor and into this file first.
+   ══════════════════════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════════════════════
    ██  KREW  MARKETING  —  WorkLog  backend
    ██  PASTE THIS ONLY INTO THE SCRIPT BOUND TO:  "worklog database"
