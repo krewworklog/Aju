@@ -837,7 +837,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v27';
+const APP_VERSION='v28';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -3057,7 +3057,14 @@ async function postAnnouncement(){
     const from=res&&res.showFrom?annWhen(res.showFrom):'';
     const until=res&&res.showUntil?annWhen(res.showUntil):'';
     const n=document.getElementById('ann-note');
-    if(n&&from)n.innerHTML=`<strong style="color:var(--green)">Posted.</strong> This will appear to staff on <strong>${from}</strong> and stay up for 24 hours${until?`, until ${until}`:''}.`;
+    if(n&&from){
+      // The backend owns the schedule. Report whichever it chose: an
+      // immediate go-live reads differently from a future one.
+      const liveNow=new Date(res.showFrom).getTime()<=Date.now()+60000;
+      n.innerHTML=liveNow
+        ?`<strong style="color:var(--green)">Posted — live now.</strong> Staff see it as soon as they open the app${until?`, and it stays up until <strong>${until}</strong>`:''}.`
+        :`<strong style="color:var(--green)">Posted.</strong> This will appear to staff on <strong>${from}</strong> and stay up for 24 hours${until?`, until ${until}`:''}.`;
+    }
     toast('Announcement posted.','ok');
   }catch(e){
     const e2=document.getElementById('ann-err');
