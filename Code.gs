@@ -88,7 +88,7 @@ function handleRequest(e) {
     const action = params.action;
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     assertRightSpreadsheet(ss);
-    ensureSheets(ss);
+    ensureSchema(ss);
     try { ensureMonthlyReportTasks(ss); } catch (e) { /* never block a request on this */ }
 
     let result;
@@ -143,6 +143,24 @@ function handleRequest(e) {
   } catch (err) {
     return jsonResponse({ error: String(err), stack: err.stack });
   }
+}
+
+// ensureSheets() walks all 17 tabs and reads each header row — about 2-4s of
+// work — and it was running on EVERY request. The schema only changes when
+// this script does, so remember that it is in order and skip the walk. The
+// cache key is derived from SHEETS itself, so ANY schema edit (new tab, new
+// column) invalidates it automatically and the migration runs once.
+function schemaKey() {
+  const s = Object.keys(SHEETS).map(k => k + SHEETS[k].join()).join();
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return 'schema_ok_krew_' + h;
+}
+function ensureSchema(ss) {
+  const cache = CacheService.getScriptCache();
+  if (cache.get(schemaKey()) === '1') return;
+  ensureSheets(ss);
+  cache.put(schemaKey(), '1', 21600);   // 6 hours
 }
 
 function jsonResponse(obj) {
