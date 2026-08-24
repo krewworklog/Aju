@@ -863,7 +863,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v30';
+const APP_VERSION='v31';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1776,9 +1776,9 @@ function renderMyAttendance(){
       <p style="font-size:13px;color:var(--ink2);margin-bottom:12px">Office hours today: <strong>${officeHoursLabel(today)}</strong> · expected <strong>${exp}h</strong></p>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         ${!rec||!rec.checkIn
-          ?`<button class="btn btn-primary" onclick="attnCheckIn()">🟢 Check In</button>`
+          ?`<button class="btn btn-primary" id="btn-checkin" onclick="attnCheckIn()">🟢 Check In</button>`
           :`<span class="tag t-ok">🟢 In at ${rec.checkIn}</span>`}
-        ${rec&&rec.checkIn&&!rec.checkOut?`<button class="btn btn-danger" onclick="attnCheckOut()">🔴 Check Out</button>`:''}
+        ${rec&&rec.checkIn&&!rec.checkOut?`<button class="btn btn-danger" id="btn-checkout" onclick="attnCheckOut()">🔴 Check Out</button>`:''}
         ${rec&&rec.checkOut?`<span class="tag t-late">🔴 Out at ${rec.checkOut}</span><span class="tag t-pu">${attnHoursWorked(rec).toFixed(1)}h worked</span>`:''}
       </div>`}
   </div>`;
@@ -1836,14 +1836,47 @@ async function attnSaveFix(){
     await syncAll();renderMyAttendance();toast('Attendance updated ✅','ok');
   }catch(e){toast('Failed: '+e.message,'err');}
 }
+// Apps Script regularly loses the RESPONSE to a write that did land — it
+// answers with an HTML error page instead of JSON. A thrown error therefore
+// does NOT mean "not saved". Before telling anyone their check-in failed,
+// re-sync and look at what the server actually holds. Getting this wrong is
+// what left staff staring at a Check In button they had already pressed.
+let attnBusy=false;
+async function attnSave(action,payload,okMsg,landed){
+  if(attnBusy)return;                       // no pile-ups from repeated taps
+  attnBusy=true;
+  ['btn-checkin','btn-checkout'].forEach(id=>{const b=document.getElementById(id);if(b){b.disabled=true;b.textContent='Saving…';}});
+  try{
+    let threw=null;
+    try{ await api(action,payload); }catch(e){ threw=e; }
+    // Always re-read the server, whether or not the call reported success.
+    try{ await syncAll(); }catch(_){}
+    const rec=attnFor(session.user.id,todayStr());
+    renderMyAttendance();
+    if(landed(rec)){ toast(okMsg,'ok'); return; }
+    toast(threw?'Could not reach the server — nothing was saved. Please try again.'
+               :'That did not save. Please try again.','err');
+  } finally { attnBusy=false; }
+}
 async function attnCheckIn(){
-  try{await api('attnCheckIn',{staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkIn:nowTime()});await syncAll();renderMyAttendance();toast('Checked in ✅','ok');}
-  catch(e){toast('Failed: '+e.message,'err');}
+  return attnSave('attnCheckIn',
+    {staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkIn:nowTime()},
+    'Checked in ✅', r=>!!(r&&r.checkIn));
 }
 async function attnCheckOut(){
-  try{await api('attnCheckOut',{staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkOut:nowTime()});await syncAll();renderMyAttendance();toast('Checked out ✅','ok');}
-  catch(e){toast('Failed: '+e.message,'err');}
+  return attnSave('attnCheckOut',
+    {staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkOut:nowTime()},
+    'Checked out ✅', r=>!!(r&&r.checkOut));
 }
+// A view left open goes stale. Coming back to the attendance page re-reads the
+// server, so a check-in made on another device — or one whose response was
+// lost — shows up instead of the button.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden||!session.user)return;
+  const p=document.querySelector('.page.active');
+  if(!p||p.id!=='page-my-attendance')return;
+  syncAll().then(()=>renderMyAttendance()).catch(()=>{});
+});
 async function attnLogOvertime(){
   const date=document.getElementById('ot-date').value;
   const hours=parseFloat(document.getElementById('ot-hours').value)||0;
