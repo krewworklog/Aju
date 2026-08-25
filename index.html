@@ -869,7 +869,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v32';
+const APP_VERSION='v33';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1131,9 +1131,17 @@ async function syncAll(){
     if(document.getElementById('screen-app').classList.contains('active')){
       const activePage = document.querySelector('.page.active');
       if(activePage){
-        const pageId = activePage.id.replace('page-','');
-        const el = document.querySelector(`.nav.active`);
-        gp(pageId, el);
+        // Never rebuild the page under someone's hands. A re-render replaces
+        // the form's DOM and takes whatever they were typing with it, so if a
+        // field on this page has focus, leave the page alone — the data is
+        // already updated and the next navigation will show it.
+        const ae = document.activeElement;
+        const typing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && activePage.contains(ae);
+        if(!typing){
+          const pageId = activePage.id.replace('page-','');
+          const el = document.querySelector(`.nav.active`);
+          gp(pageId, el);
+        }
       }
     }
     toast('Synced.','ok');
@@ -3117,8 +3125,22 @@ function annCard(a,canDelete,badge){
   </div>`;
 }
 
+// A half-written announcement survives any re-render: the text is lifted out
+// before the form's HTML is replaced and put straight back afterwards.
+let annDraft={title:'',body:''};
+function annCaptureDraft(){
+  const t=document.getElementById('ann-title'), b=document.getElementById('ann-body');
+  if(t)annDraft.title=t.value;
+  if(b)annDraft.body=b.value;
+}
+function annRestoreDraft(){
+  const t=document.getElementById('ann-title'), b=document.getElementById('ann-body');
+  if(t&&annDraft.title)t.value=annDraft.title;
+  if(b&&annDraft.body)b.value=annDraft.body;
+}
 function renderAnnouncements(){
   const wrap=document.getElementById('ann-wrap');if(!wrap)return;
+  annCaptureDraft();
   const all=annsSorted((DB&&DB.announcements)||[]);
   const isExec=session.role==='exec';
   const sub=document.getElementById('ann-sub');
@@ -3153,6 +3175,7 @@ function renderAnnouncements(){
     +group('🟢 Live now',live)
     +group('🕐 Scheduled',scheduled,a=>`Goes live ${annWhen(a.showFrom)}`)
     +group('⚪ Expired',expired);
+  annRestoreDraft();
 }
 
 async function postAnnouncement(){
@@ -3168,6 +3191,7 @@ async function postAnnouncement(){
     // Report back the window the BACKEND chose, not one guessed here.
     const from=res&&res.showFrom?annWhen(res.showFrom):'';
     const until=res&&res.showUntil?annWhen(res.showUntil):'';
+    annDraft={title:'',body:''};        // posted — the draft is no longer needed
     const n=document.getElementById('ann-note');
     if(n&&from){
       // The backend owns the schedule. Report whichever it chose: an
