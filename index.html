@@ -822,7 +822,7 @@ function setSyncStatus(s){const d=document.getElementById('sync-dot');if(!d)retu
 // sat right on top of the real response time and failed constantly. Big reads
 // get a longer deadline and fewer retries (a slow read is normal); small
 // writes keep a short one, because there a stall really is a problem.
-const API_LIMITS={ getAll:{ms:30000,tries:2}, getLeaderboard:{ms:25000,tries:2} };
+const API_LIMITS={ getAll:{ms:30000,tries:3}, getLeaderboard:{ms:25000,tries:3} };
 async function api(action, data={}) {
   if(!BACKEND_URL) throw new Error('No backend URL configured');
   const lim=API_LIMITS[action]||{ms:15000,tries:3};
@@ -870,7 +870,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v34';
+const APP_VERSION='v35';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1155,7 +1155,13 @@ async function syncAll(){
     }
     toast('Synced.','ok');
   } catch(e){
-    toast('Sync failed: '+e.message,'err');
+    setSyncStatus('error');
+    // A failed background refresh is not worth alarming anyone about when the
+    // screen is already showing real (if slightly older) data — the backend
+    // is flaky by nature. A first load with nothing to fall back on still
+    // reports loudly, and callers like login always see the thrown error.
+    if(DB && DB.staff && DB.staff.length) toast('Could not refresh just now — showing the last synced data.');
+    else toast('Sync failed: '+e.message,'err');
     throw e;                    // callers (e.g. login) must see this
   }
 }
