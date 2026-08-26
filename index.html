@@ -558,6 +558,7 @@ textarea{resize:vertical;line-height:1.6;}
           <input type="month" id="sal-month" onchange="renderExecSalary()" style="width:auto"/>
           <span style="font-size:12px;color:var(--ink3)">· Sundays excluded</span>
         </div>
+        <div id="sal-exec-set"></div>
         <div id="sal-banner"></div>
         <div class="card"><div class="ct">Salary Calculation</div><div id="sal-table"></div></div>
         <div id="sal-leads"></div>
@@ -869,7 +870,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v33';
+const APP_VERSION='v34';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -1101,6 +1102,14 @@ const LEAD_TARGETS=[
    fields:[{k:'f1',label:'Client Name *',ph:'Full name'},{k:'f2',label:'Email Address *',ph:'name@email.com'}]}
 ];
 const SALARIES={'Fathima Salahudheen':4500,'Muhammed Jasim':4500,'Vyshak Babu':3900,'Peter Noyal':3900,'Afeefa Firoz':3000};
+// The executive is not a staff row — no username, no work-log entries, no lead
+// targets — but they do draw a salary. Treated as a pseudo-staff member on the
+// SALARY REPORT ONLY: never in the leaderboard, compliance or staff lists.
+// createdAt sets the date their pay starts being counted.
+const EXEC_STAFF={id:'exec',name:'Executive',createdAt:'2026-08-18'};
+function execBaseSalary(){const v=parseFloat((DB.config&&DB.config.execSalary)||'');return isNaN(v)?null:v;}
+function isExecRow(s){return String(s&&s.id)==='exec';}
+function baseSalaryFor(s){return isExecRow(s)?execBaseSalary():(SALARIES[s.name]!==undefined?SALARIES[s.name]:null);}
 const ENTRY_CUT_START='2026-08'; // 20 AED per missed entry, from August 2026
 const ENTRY_CUT=20;
 const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead target
@@ -1952,7 +1961,8 @@ function salaryDays(month,countEnd){
 function salaryRowFor(s,month,days,monthOver){
   const cutsActive=month>=ENTRY_CUT_START;
   const attnActive=month>=ATTENDANCE_START;
-  const base=SALARIES[s.name]!==undefined?SALARIES[s.name]:null;
+  const base=baseSalaryFor(s);
+  const isExec=isExecRow(s);
   let missedSlots=0;
   days.forEach(date=>{
     if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
@@ -1963,19 +1973,20 @@ function salaryRowFor(s,month,days,monthOver){
   const att=attnMonthlyForSalary(s,days);
   const attFactor=(attnActive&&att.exp>0)?Math.min(1,att.pres/att.exp):1;
   const attPay=base!=null?Math.round(base*attFactor):null;
-  const entryCut=cutsActive&&base!=null?missedSlots*ENTRY_CUT:0;
+  // The executive files no work-log entries, so entry deductions cannot apply.
+  const entryCut=(!isExec&&cutsActive&&base!=null)?missedSlots*ENTRY_CUT:0;
   let targetCut=0;
   const targets=targetsFor(s.name).map(t=>{
     const ok=leadsForTarget(t.id,month).length;
     const done=ok>=t.goal;
-    if(!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
+    if(!isExec&&!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
     return {t,ok,done};
   });
   // Onboarding: the executive signs off once a month. An explicit "no" bites
   // immediately; leaving it unmarked only bites once the month has closed, so
   // nobody is docked for a review that simply has not happened yet.
   const onb=onboardState(month,s.id);
-  const onbCut=(base!=null&&onb!=='yes'&&(onb==='no'||monthOver))?Math.round(base*ONBOARD_CUT_PCT/100):0;
+  const onbCut=(!isExec&&base!=null&&onb!=='yes'&&(onb==='no'||monthOver))?Math.round(base*ONBOARD_CUT_PCT/100):0;
   const enrolled=!!incMemberFor(s.id);
   const assess=enrolled?incAssess(s,month):null;
   const incQualified=!!(assess&&assess.qualified);
@@ -1984,6 +1995,38 @@ function salaryRowFor(s,month,days,monthOver){
   return {s,base,att,attFactor,attPay,missedSlots,entryCut,targets,targetCut,onb,onbCut,
           enrolled,assess,incQualified,incAmount,finalPay,cutsActive,attnActive};
 }
+// Only the executive can set their own base salary. HR sees the resulting row
+// on the report but gets no control to change it.
+function renderExecSalarySetter(){
+  const el=document.getElementById('sal-exec-set');if(!el)return;
+  if(session.role!=='exec'){el.innerHTML='';return;}
+  const cur=execBaseSalary();
+  el.innerHTML=`<div class="card" style="border-color:rgba(245,158,11,.3)">
+    <div class="ct">🏛 Executive salary</div>
+    <p style="font-size:12px;color:var(--ink3);margin-bottom:12px">
+      ${cur!=null?`Currently <strong>${cur.toLocaleString()} AED</strong> — counted from ${EXEC_STAFF.createdAt}, on the same hours rule as staff.`
+                 :'<strong style="color:var(--amber)">Not set.</strong> The executive will not appear on the report until a base salary is entered.'}
+      Visible to you and HR only — never in the leaderboard, compliance or staff lists.</p>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div class="f" style="margin:0;flex:1;min-width:160px"><label>Monthly base salary (AED)</label>
+        <input type="number" min="0" step="1" id="ex-sal" value="${cur!=null?cur:''}" placeholder="e.g. 6000"/></div>
+      <button class="btn btn-primary btn-sm" onclick="saveExecSalary()">Save</button>
+    </div>
+    <p id="ex-sal-err" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></p>
+  </div>`;
+}
+async function saveExecSalary(){
+  const err=document.getElementById('ex-sal-err');if(err)err.style.display='none';
+  const v=parseFloat(document.getElementById('ex-sal').value);
+  if(isNaN(v)||v<0){if(err){err.textContent='Enter a number.';err.style.display='block';}return;}
+  try{
+    await api('setConfigKey',{key:'execSalary',value:String(v)});
+    await syncAll();
+    renderExecSalary();
+    toast('Executive salary saved.','ok');
+  }catch(e){if(err){err.textContent='Could not save: '+e.message;err.style.display='block';}}
+}
+
 function targetTagsHtml(row,monthOver){
   return row.targets.length?row.targets.map(x=>
     `<span class="tag ${x.done?'t-ok':(monthOver?'t-late':'t-pu')}">${x.t.icon} ${x.ok}/${x.t.goal}${x.done?' ✓':(monthOver?' ✗':'')}</span>`
@@ -2329,6 +2372,7 @@ function renderExecSalary(){
     if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
     cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   }
+  renderExecSalarySetter();
   const banner=document.getElementById('sal-banner');
   let notes=[];
   if(!attnActive)notes.push('Attendance-based pay applies from August 2026 — for this month full base pay is used regardless of hours.');
@@ -2338,7 +2382,9 @@ function renderExecSalary(){
   if(attnActive)notes.push('A day with a check-in but no check-out counts as half a day, not a lost day — forgetting the evening tap costs half, never the whole day.');
   notes.push(`Onboarding: mark Yes once a staff member has completed onboarding for all their clients. An explicit No applies the ${ONBOARD_CUT_PCT}% cut straight away; left unmarked it only applies once the month has closed.`);
   banner.innerHTML=notes.length?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>ℹ️</span><span>${notes.join(' ')}</span></div>`:'';
-  const rows=DB.staff.map(s=>salaryRowFor(s,month,days,monthOver));
+  const people=[...DB.staff];
+  if(execBaseSalary()!=null)people.push(EXEC_STAFF);
+  const rows=people.map(s=>salaryRowFor(s,month,days,monthOver));
   const totBase=rows.reduce((a,r)=>a+(r.base||0),0);
   const totFinal=rows.reduce((a,r)=>a+(r.finalPay||0),0);
   document.getElementById('sal-table').innerHTML=`
