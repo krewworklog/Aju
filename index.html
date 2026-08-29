@@ -871,7 +871,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v37';
+const APP_VERSION='v38';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1144,7 +1144,7 @@ const ENTRY_CUT=20;
 // whatever the working calendar actually was. Anyone listed here is excluded.
 const OT_MULTIPLIER=1.5;
 const OT_PAY_START='2026-08';
-const OT_EXCLUDED=['Muhammed Jasim'];
+const OT_EXCLUDED=[];   // nobody is excluded — all staff are paid for overtime
 const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead target
 // Attendance and entry logging were unreliable until the check-out bug was
 // fixed on 20 Aug 2026, so every working day up to and including this date is
