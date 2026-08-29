@@ -1136,6 +1136,11 @@ function setMgmtScore(ss, params) {
 //  month format: "2026-08". Omit to use the current month.
 // ══════════════════════════════════════════════════════════════
 
+// Public holidays — excluded from working days exactly like the off day, so
+// the leaderboard agrees with the salary report. Keep in step with HOLIDAYS
+// in index.html.
+var HOLIDAYS = { '2026-08-28': 'Public holiday' };
+
 function getLeaderboard(ss, month) {
   const tz = ss.getSpreadsheetTimeZone();
   const m = month || Utilities.formatDate(new Date(), tz, 'yyyy-MM');
@@ -1154,8 +1159,11 @@ function getLeaderboard(ss, month) {
   const lastDayOfMonth = new Date(y, mo, 0).getDate();
   const lastDay = isCurrentMonth ? parseInt(todayStr.slice(8, 10), 10) : lastDayOfMonth;
 
+  const pad2 = n => (n < 10 ? '0' + n : '' + n);
   let workingDays = 0;
   for (let d = 1; d <= lastDay; d++) {
+    const ds = y + '-' + pad2(mo) + '-' + pad2(d);
+    if (HOLIDAYS[ds]) continue;                       // public holiday
     if (new Date(y, mo - 1, d).getDay() !== offDay) workingDays++;
   }
   if (workingDays < 1) workingDays = 1;

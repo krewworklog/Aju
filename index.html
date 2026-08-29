@@ -871,16 +871,29 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v36';
+const APP_VERSION='v37';
+// Dismissed for this session only — reloading is what applies the update
+// anyway, so there is nothing to remember beyond the current page life.
+let updateDeferred=false;
 function checkUpdate(){
+  if(updateDeferred)return;
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
-    if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
-      const b=document.createElement('div');
-      b.id='upd-bar';
-      b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:200;background:var(--accent);color:#fff;text-align:center;padding:10px;font-size:13px;font-weight:600;cursor:pointer';
-      b.textContent='A new version of the app is available — tap here to update';
-      b.onclick=()=>location.reload();
-      document.body.appendChild(b);
+    if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-modal')){
+      const ov=document.createElement('div');
+      ov.id='upd-modal';
+      ov.className='modal-ov show';
+      ov.innerHTML=`<div class="modal" style="width:360px;text-align:center">
+        <div style="font-size:34px;line-height:1;margin-bottom:10px">🔄</div>
+        <div class="modal-t">Update available</div>
+        <p class="modal-s">A newer version of WorkLog is ready. It takes a second, and nothing you have saved is affected.</p>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="btn btn-ghost" id="upd-later">Later</button>
+          <button class="btn btn-primary" id="upd-now">Update now</button>
+        </div>
+      </div>`;
+      document.body.appendChild(ov);
+      ov.querySelector('#upd-now').onclick=()=>location.reload();
+      ov.querySelector('#upd-later').onclick=()=>{updateDeferred=true;ov.remove();};
     }
   }).catch(()=>{});
 }
