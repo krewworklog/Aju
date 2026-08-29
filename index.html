@@ -556,7 +556,8 @@ textarea{resize:vertical;line-height:1.6;}
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
           <label style="font-size:12px;color:var(--ink3)">Month</label>
           <input type="month" id="sal-month" onchange="renderExecSalary()" style="width:auto"/>
-          <span style="font-size:12px;color:var(--ink3)">· Sundays excluded</span>
+          <span style="font-size:12px;color:var(--ink3)">· Sundays and public holidays excluded</span>
+          <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="downloadSalaryReport()">⬇ Download report</button>
         </div>
         <div id="sal-exec-set"></div>
         <div id="sal-banner"></div>
@@ -870,7 +871,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v35';
+const APP_VERSION='v36';
 function checkUpdate(){
   fetch('version.json?_='+Date.now()).then(r=>r.json()).then(j=>{
     if(j && j.v && j.v!==APP_VERSION && !document.getElementById('upd-bar')){
@@ -948,7 +949,7 @@ function incReportFor(month,staffId){ return (DB.incReports||[]).find(r=>String(
 function incWorkdays(month,end,createdAt){
   const days=[]; let cur=month+'-01';
   while(cur<=end&&days.length<32){
-    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0 && (!createdAt||String(createdAt).slice(0,10)<=cur)) days.push(cur);
+    if(!isOffDay(cur) && (!createdAt||String(createdAt).slice(0,10)<=cur)) days.push(cur);
     cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   }
   return days;
@@ -995,13 +996,25 @@ function clientServicesFor(name){return (DB.clientServices&&DB.clientServices[na
 // Attendance affects pay proportionally from this month onward (no back-charge
 // for months before staff were checking in).
 const ATTENDANCE_START='2026-08';
+// Public holidays. Treated exactly like Sunday: no expected hours, no missed
+// entries, and excluded from every working-day count.
+const HOLIDAYS={'2026-08-28':'Public holiday'};
+function isHoliday(dateStr){return !!HOLIDAYS[String(dateStr).slice(0,10)];}
+function holidayName(dateStr){return HOLIDAYS[String(dateStr).slice(0,10)]||'';}
 function expectedHoursForDay(dateStr){
+  if(isHoliday(dateStr))return 0;
   const day=new Date(dateStr+'T00:00:00Z').getUTCDay(); // 0 Sun … 6 Sat
   if(day===0)return 0;      // Sunday off
   if(day===6)return 6.5;    // Saturday 10:00–16:30
   return 9;                 // Mon–Fri 10:00–19:00
 }
+// A day nobody is expected in: Sunday or a public holiday.
+function isOffDay(dateStr){
+  if(isHoliday(dateStr))return true;
+  return new Date(dateStr+'T00:00:00Z').getUTCDay()===0;
+}
 function officeHoursLabel(dateStr){
+  if(isHoliday(dateStr))return holidayName(dateStr);
   const day=new Date(dateStr+'T00:00:00Z').getUTCDay();
   if(day===0)return 'Day off';
   if(day===6)return '10:00 – 16:30';
@@ -1011,6 +1024,7 @@ function attnFor(staffId,date){return (DB.attendance||[]).find(a=>String(a.staff
 function parseHM(s){const m=String(s||'').match(/(\d{1,2}):(\d{2})/);return m?(+m[1]*60+ +m[2]):null;}
 // Official window in minutes-of-day. Sunday returns null.
 function officeWindow(dateStr){
+  if(isHoliday(dateStr))return null;
   const day=new Date(dateStr+'T00:00:00Z').getUTCDay();
   if(day===0)return null;
   return { start:10*60, end: day===6 ? 16*60+30 : 19*60 };
@@ -1112,6 +1126,12 @@ function isExecRow(s){return String(s&&s.id)==='exec';}
 function baseSalaryFor(s){return isExecRow(s)?execBaseSalary():(SALARIES[s.name]!==undefined?SALARIES[s.name]:null);}
 const ENTRY_CUT_START='2026-08'; // 20 AED per missed entry, from August 2026
 const ENTRY_CUT=20;
+// Overtime is PAID at 1.5x the hourly rate, from the month below. The hourly
+// rate is the base salary divided by the month's expected hours, so it tracks
+// whatever the working calendar actually was. Anyone listed here is excluded.
+const OT_MULTIPLIER=1.5;
+const OT_PAY_START='2026-08';
+const OT_EXCLUDED=['Muhammed Jasim'];
 const TARGET_CUT_PCT=5;          // % salary cut for a missed monthly lead target
 // Attendance and entry logging were unreliable until the check-out bug was
 // fixed on 20 Aug 2026, so every working day up to and including this date is
@@ -1693,7 +1713,7 @@ function renderCompMissed(){
   let cur=from;
   while(cur<=to&&days.length<93){
     // Sundays are the team's day off — never counted as missed.
-    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
+    if(!isOffDay(cur))days.push(cur);
     cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   }
   const staffRows=DB.staff.map(s=>({s,full:[],partial:[]}));
@@ -1923,7 +1943,7 @@ async function attnLogOvertime(){
 function attnWorkdays(month,end){
   const days=[];let cur=month+'-01';
   while(cur<=end&&days.length<32){
-    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
+    if(!isOffDay(cur))days.push(cur);
     cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   }
   return days;
@@ -1944,7 +1964,7 @@ function attnMonthlyForStaff(s,days){
 // Attendance for PAY only. Days on or before GRACE_UNTIL count as full days;
 // the Attendance report deliberately still shows real hours, because the grace
 // is a payroll decision, not a claim about who was actually in the office.
-function attnMonthlyForSalary(s,days){
+function attnMonthlyForSalary(s,days,month){
   let exp=0,pres=0,graced=0,halfDays=0;
   days.forEach(date=>{
     if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
@@ -1954,12 +1974,21 @@ function attnMonthlyForSalary(s,days){
     const a=attnFor(s.id,date);
     if(a){pres+=attnPresentHours(a);if(attnMissingCheckout(a))halfDays++;}
   });
-  return {exp,pres,graced,halfDays};
+  // Overtime is counted across the WHOLE month, including days off — that is
+  // when most of it happens (weekend shoots, holiday deliveries).
+  let otHours=0;
+  (DB.attendance||[]).forEach(a=>{
+    if(String(a.staffId)!==String(s.id))return;
+    if(String(a.date).slice(0,7)!==month)return;
+    if(s.createdAt&&String(s.createdAt).slice(0,10)>String(a.date))return;
+    otHours+=parseFloat(a.otHours)||0;
+  });
+  return {exp,pres,graced,halfDays,otHours};
 }
 function salaryDays(month,countEnd){
   const days=[];let cur=month+'-01';
   while(cur<=countEnd&&days.length<32){
-    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
+    if(!isOffDay(cur))days.push(cur);
     cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   }
   return days;
@@ -1976,7 +2005,7 @@ function salaryRowFor(s,month,days,monthOver){
     const n=DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length;
     missedSlots+=Math.max(0,2-n);
   });
-  const att=attnMonthlyForSalary(s,days);
+  const att=attnMonthlyForSalary(s,days,month);
   const attFactor=(attnActive&&att.exp>0)?Math.min(1,att.pres/att.exp):1;
   const attPay=base!=null?Math.round(base*attFactor):null;
   // The executive files no work-log entries, so entry deductions cannot apply.
@@ -1997,9 +2026,13 @@ function salaryRowFor(s,month,days,monthOver){
   const assess=enrolled?incAssess(s,month):null;
   const incQualified=!!(assess&&assess.qualified);
   const incAmount=(incQualified&&base!=null)?Math.round(base*incRaisePct()/100):0;
-  const finalPay=base!=null?attPay-entryCut-targetCut-onbCut+incAmount:null;
+  // Overtime pay: hours x hourly rate x 1.5. Excluded staff earn nothing extra.
+  const otEligible=!OT_EXCLUDED.includes(s.name)&&month>=OT_PAY_START&&base!=null&&att.exp>0;
+  const otRate=otEligible?(base/att.exp)*OT_MULTIPLIER:0;
+  const otPay=otEligible?Math.round(att.otHours*otRate):0;
+  const finalPay=base!=null?attPay-entryCut-targetCut-onbCut+incAmount+otPay:null;
   return {s,base,att,attFactor,attPay,missedSlots,entryCut,targets,targetCut,onb,onbCut,
-          enrolled,assess,incQualified,incAmount,finalPay,cutsActive,attnActive};
+          enrolled,assess,incQualified,incAmount,otEligible,otRate,otPay,finalPay,cutsActive,attnActive};
 }
 // Only the executive can set their own base salary. HR sees the resulting row
 // on the report but gets no control to change it.
@@ -2031,6 +2064,40 @@ async function saveExecSalary(){
     renderExecSalary();
     toast('Executive salary saved.','ok');
   }catch(e){if(err){err.textContent='Could not save: '+e.message;err.style.display='block';}}
+}
+
+// Final salary report as CSV — what HR actually pays from. Built from the same
+// rows the table renders, so the file can never disagree with the screen.
+function downloadSalaryReport(){
+  const d=window.__salRows;
+  if(!d||!d.rows||!d.rows.length){toast('Open the salary table first.','err');return;}
+  const q=v=>{const t=String(v==null?'':v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
+  const head=['Staff','Base (AED)','Expected hours','Hours present','Attendance %','Attendance pay',
+              'Missed entries','Entry cut','Target cut','Onboarding','Onboarding cut','Increment',
+              'Overtime hours','Overtime pay','Final pay (AED)'];
+  const lines=[head.join(',')];
+  d.rows.forEach(r=>{
+    const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
+    lines.push([r.s.name,r.base!=null?r.base:'',r.att.exp.toFixed(1),r.att.pres.toFixed(1),pct+'%',
+      r.attPay!=null?r.attPay:'',r.missedSlots,r.entryCut?-r.entryCut:0,r.targetCut?-r.targetCut:0,
+      r.onb||'not marked',r.onbCut?-r.onbCut:0,r.incAmount||0,
+      r.att.otHours||0,r.otEligible?r.otPay:0,r.finalPay!=null?r.finalPay:''].map(q).join(','));
+  });
+  const tot=d.rows.reduce((a,r)=>a+(r.finalPay||0),0);
+  lines.push(['TOTAL','','','','','','','','','','','','',
+    d.rows.reduce((a,r)=>a+(r.otEligible?r.otPay:0),0),tot].map(q).join(','));
+  lines.push('');
+  lines.push(q(`Period ${d.monthStart} to ${d.countEnd} · ${d.days.length} working days · Sundays and public holidays excluded`));
+  lines.push(q(`Overtime paid at ${OT_MULTIPLIER}x hourly${OT_EXCLUDED.length?' (excluded: '+OT_EXCLUDED.join('; ')+')':''}`));
+  lines.push(q(`Generated ${todayStr()} ${nowTime()} by ${session.user?session.user.name:''}`));
+  // BOM so Excel opens the AED figures and any accents correctly.
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`krew-salary-${d.month}.csv`;
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);
+  toast('Salary report downloaded.','ok');
 }
 
 function targetTagsHtml(row,monthOver){
@@ -2069,7 +2136,7 @@ function renderExecAttendance(){
       </tr>`;
     }).join('')}
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:8px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). "Hours worked" counts only time inside official hours (10:00–19:00, Sat 10:00–16:30) — early arrival or staying late never compensates for a short day; extra time goes in the overtime log.</p>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
+    <p style="font-size:11px;color:var(--ink3);margin-top:8px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays and public holidays excluded). "Hours worked" counts only time inside official hours (10:00–19:00, Sat 10:00–16:30) — early arrival or staying late never compensates for a short day; extra time goes in the overtime log.</p>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
   const recs=[...(DB.attendance||[])].filter(a=>String(a.date).slice(0,7)===month).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   document.getElementById('attn-records').innerHTML=recs.length?`
     <table class="stbl"><thead><tr><th>Date</th><th>Staff</th><th>In</th><th>Out</th><th>Worked</th><th>Overtime</th></tr></thead><tbody>
@@ -2348,6 +2415,7 @@ function renderMySalary(){
       ${row('Pay after attendance',r.attPay.toLocaleString()+' AED')}
       ${row('Missed entries',r.missedSlots+' slot'+(r.missedSlots===1?'':'s'),r.cutsActive?`${ENTRY_CUT} AED each · only counted after ${GRACE_UNTIL}`:'no entry cut this month')}
       ${row('Entry deduction',r.entryCut?'− '+r.entryCut.toLocaleString()+' AED':'0',null,r.entryCut?'var(--red)':'var(--ink3)')}
+      ${r.att.otHours?row('Overtime',r.otEligible?'+ '+r.otPay.toLocaleString()+' AED':'not paid',`${r.att.otHours}h logged${r.otEligible?` · ${OT_MULTIPLIER}× hourly rate`:' · overtime is recorded but not paid on your account'}`,r.otEligible?'var(--green)':'var(--ink3)'):''}
       ${row('Lead target',targetTagsHtml(r,monthOver))}
       ${row('Target deduction',r.targetCut?'− '+r.targetCut.toLocaleString()+' AED':'0',monthOver?null:'only applies if still unmet at month end',r.targetCut?'var(--red)':'var(--ink3)')}
       ${row('Client onboarding',onboardTag(r.onb,monthOver),'signed off by the executive')}
@@ -2375,7 +2443,7 @@ function renderExecSalary(){
   const attnActive=month>=ATTENDANCE_START;
   const days=[];let cur=monthStart;
   while(cur<=countEnd&&days.length<32){
-    if(new Date(cur+'T00:00:00Z').getUTCDay()!==0)days.push(cur);
+    if(!isOffDay(cur))days.push(cur);
     cur=new Date(Date.parse(cur+'T00:00:00Z')+86400000).toISOString().slice(0,10);
   }
   renderExecSalarySetter();
@@ -2386,6 +2454,9 @@ function renderExecSalary(){
   if(!monthOver)notes.push(`Month still in progress — the ${TARGET_CUT_PCT}% target cut only applies if the goal is still unmet at month end.`);
   if(month===GRACE_UNTIL.slice(0,7))notes.push(`Every working day up to and including ${GRACE_UNTIL} is paid as a full day with no missed-entry cut, because check-outs were being lost until the fix on 20 Aug. Normal rules apply from the next working day.`);
   if(attnActive)notes.push('A day with a check-in but no check-out counts as half a day, not a lost day — forgetting the evening tap costs half, never the whole day.');
+  const hol=Object.keys(HOLIDAYS).filter(d=>d.slice(0,7)===month);
+  if(hol.length)notes.push(`Public holiday${hol.length>1?'s':''} ${hol.join(', ')} — treated like a Sunday: no expected hours and no missed-entry cut.`);
+  if(month>=OT_PAY_START)notes.push(`Overtime is paid at ${OT_MULTIPLIER}× the hourly rate (base ÷ expected hours)${OT_EXCLUDED.length?`, except for ${OT_EXCLUDED.join(', ')}`:''}.`);
   notes.push(`Onboarding: mark Yes once a staff member has completed onboarding for all their clients. An explicit No applies the ${ONBOARD_CUT_PCT}% cut straight away; left unmarked it only applies once the month has closed.`);
   banner.innerHTML=notes.length?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>ℹ️</span><span>${notes.join(' ')}</span></div>`:'';
   const people=[...DB.staff];
@@ -2393,8 +2464,10 @@ function renderExecSalary(){
   const rows=people.map(s=>salaryRowFor(s,month,days,monthOver));
   const totBase=rows.reduce((a,r)=>a+(r.base||0),0);
   const totFinal=rows.reduce((a,r)=>a+(r.finalPay||0),0);
+  const totOt=rows.reduce((a,r)=>a+(r.otPay||0),0);
+  window.__salRows={rows,month,days,monthStart,countEnd};   // for the CSV export
   document.getElementById('sal-table').innerHTML=`
-    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Onboarding</th><th>Onb. cut</th><th>Increment</th><th>Final (AED)</th></tr></thead><tbody>
+    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Onboarding</th><th>Onb. cut</th><th>Increment</th><th>Overtime</th><th>Final (AED)</th></tr></thead><tbody>
     ${rows.map(r=>{
       const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
       return `<tr>
@@ -2413,9 +2486,10 @@ function renderExecSalary(){
       </select></td>
       <td style="color:${r.onbCut?'var(--red)':'var(--ink3)'}">${r.onbCut?'−'+r.onbCut.toLocaleString():'0'}</td>
       <td>${!r.enrolled?'<span style="color:var(--ink3)">—</span>':(r.incQualified?`<span class="tag t-ok">+${r.incAmount.toLocaleString()}</span>`:'<span class="tag t-pu">not met</span>')}</td>
+      <td>${!r.att.otHours?'<span style="color:var(--ink3)">—</span>':(r.otEligible?`<span class="tag t-ok">+${r.otPay.toLocaleString()}</span> <span style="font-size:11px;color:var(--ink3)">${r.att.otHours}h</span>`:`<span class="tag t-pu">${r.att.otHours}h unpaid</span>`)}</td>
       <td style="font-family:var(--font);font-weight:800;color:${r.finalPay!=null&&r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay!=null?r.finalPay.toLocaleString():'—'}</td>
     </tr>`;}).join('')}
-    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
+    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totOt?'+'+totOt.toLocaleString():''}</td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
     </tbody></table>
     <p style="font-size:11px;color:var(--ink3);margin-top:10px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Attendance pay = base × (hours present ÷ expected). Missed entries: each of the 2 daily slots counts once, at ${ENTRY_CUT} AED. Increment = +${incRaisePct()}% for enrolled staff who met all three programme targets.</p>`;
   document.getElementById('sal-leads').innerHTML=LEAD_TARGETS.map(t=>{
