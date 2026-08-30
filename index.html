@@ -382,6 +382,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-managers',this)"><span class="nav-ic">🛡</span>Manager Accounts</div>
         <div class="nav" onclick="gp('exec-clients-mgmt',this)"><span class="nav-ic">🏢</span>Clients</div>
         <div class="nav" onclick="gp('exec-passwd',this)"><span class="nav-ic">🔑</span>Executive Password</div>
+        <div class="nav" onclick="gp('exec-leave',this)"><span class="nav-ic">🌴</span>Staff Leave</div>
         <div class="nav" onclick="gp('exec-hr',this)"><span class="nav-ic">🧾</span>HR Access</div>
       </div>
       <!-- HR sees the salary report and nothing else. -->
@@ -690,6 +691,12 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="exec-tasks-list"></div>
       </div>
 
+      <!-- EXEC: STAFF LEAVE -->
+      <div class="page" id="page-exec-leave">
+        <div class="ph"><div><div class="pt">Staff Leave</div><p class="ps">Record time off. Days on leave never carry a missed-entry cut. Paid leave also leaves the attendance percentage untouched; unpaid leave reduces pay for those days.</p></div></div>
+        <div id="leave-wrap"></div>
+      </div>
+
       <!-- EXEC: HR ACCESS -->
       <div class="page" id="page-exec-hr">
         <div class="ph"><div><div class="pt">HR Access</div><p class="ps">HR signs in with its own password and sees only the salary report — no logs, attendance, tasks or staff accounts.</p></div></div>
@@ -871,7 +878,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v38';
+const APP_VERSION='v39';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1158,6 +1165,41 @@ async function setOnboard(staffId,month,val){
   catch(e){toast('Failed: '+e.message,'err');}
 }
 
+// ── Leave ────────────────────────────────────────────────────
+// Stored per staff in the config tab as "from..to:type" entries, comma
+// separated, e.g. "2026-08-23..2026-09-21:paid". Written through the existing
+// setConfigKey action, so managing leave needs no backend change.
+//   paid   — the day is removed from expected hours, so time off neither
+//            raises nor lowers the attendance percentage, and full base is paid
+//   unpaid — the day still counts as expected but with nobody present, so pay
+//            reduces proportionally
+// Either way there is never a missed-entry cut for a day on leave.
+function leaveKey(staffId){return 'leave-'+staffId;}
+function leavesFor(staffId){
+  return String((DB.config||{})[leaveKey(staffId)]||'').split(',')
+    .map(x=>x.trim()).filter(Boolean).map(x=>{
+      const [range,type]=x.split(':');
+      const [from,to]=String(range||'').split('..');
+      return {from:(from||'').trim(),to:(to||'').trim(),type:(type||'paid').trim()};
+    }).filter(l=>/^\d{4}-\d{2}-\d{2}$/.test(l.from)&&/^\d{4}-\d{2}-\d{2}$/.test(l.to));
+}
+function leaveOn(staffId,date){
+  const d=String(date).slice(0,10);
+  return leavesFor(staffId).find(l=>d>=l.from&&d<=l.to)||null;
+}
+function serialiseLeaves(list){
+  return list.map(l=>`${l.from}..${l.to}:${l.type}`).join(',');
+}
+async function saveLeaves(staffId,list){
+  await api('setConfigKey',{key:leaveKey(staffId),value:serialiseLeaves(list)});
+  await syncAll();
+}
+// End date for a leave that starts on `from` and runs `days` calendar days.
+function leaveEnd(from,days){
+  const d=new Date(Date.parse(from+'T00:00:00Z')+ (Math.max(1,days)-1)*86400000);
+  return d.toISOString().slice(0,10);
+}
+
 const SALES_STATUSES=['Contacted','Approved','Denied','No response'];
 function leadTargetDef(l){return LEAD_TARGETS.find(t=>t.id===String(l.targetId))||LEAD_TARGETS[0];}
 function targetsFor(name){return LEAD_TARGETS.filter(t=>t.staff.some(n=>n.toLowerCase()===String(name||'').toLowerCase()));}
@@ -1417,6 +1459,7 @@ function gp(id,el){
     'exec-reports':renderExecReports,
     'exec-clients-mgmt':()=>renderClientsOnboarding('exec-clients-onboard'),
     'exec-hr':renderHrAccess,
+    'exec-leave':renderStaffLeave,
     'announcements':renderAnnouncements,
     'leaderboard':loadLeaderboard,
   };
@@ -1978,11 +2021,16 @@ function attnMonthlyForStaff(s,days){
 // the Attendance report deliberately still shows real hours, because the grace
 // is a payroll decision, not a claim about who was actually in the office.
 function attnMonthlyForSalary(s,days,month){
-  let exp=0,pres=0,graced=0,halfDays=0;
+  let exp=0,pres=0,graced=0,halfDays=0,leaveDays=0;
   days.forEach(date=>{
     if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
     const eh=expectedHoursForDay(date);
+    const lv=leaveOn(s.id,date);
+    // Paid leave: the day drops out of the expectation entirely, so time off
+    // neither helps nor hurts the percentage. Unpaid leave stays expected.
+    if(lv&&lv.type==='paid'){leaveDays++;return;}
     exp+=eh;
+    if(lv){leaveDays++;return;}              // unpaid leave: expected, nobody in
     if(date<=GRACE_UNTIL){pres+=eh;graced++;return;}
     const a=attnFor(s.id,date);
     if(a){pres+=attnPresentHours(a);if(attnMissingCheckout(a))halfDays++;}
@@ -1996,7 +2044,7 @@ function attnMonthlyForSalary(s,days,month){
     if(s.createdAt&&String(s.createdAt).slice(0,10)>String(a.date))return;
     otHours+=parseFloat(a.otHours)||0;
   });
-  return {exp,pres,graced,halfDays,otHours};
+  return {exp,pres,graced,halfDays,leaveDays,otHours};
 }
 function salaryDays(month,countEnd){
   const days=[];let cur=month+'-01';
@@ -2015,6 +2063,7 @@ function salaryRowFor(s,month,days,monthOver){
   days.forEach(date=>{
     if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
     if(date<=GRACE_UNTIL)return;              // graced: entries not counted
+    if(leaveOn(s.id,date))return;            // on leave: nothing was expected
     const n=DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length;
     missedSlots+=Math.max(0,2-n);
   });
@@ -2087,17 +2136,17 @@ function downloadSalaryReport(){
   const q=v=>{const t=String(v==null?'':v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
   const head=['Staff','Base (AED)','Expected hours','Hours present','Attendance %','Attendance pay',
               'Missed entries','Entry cut','Target cut','Onboarding','Onboarding cut','Increment',
-              'Overtime hours','Overtime pay','Final pay (AED)'];
+              'Leave days','Overtime hours','Overtime pay','Final pay (AED)'];
   const lines=[head.join(',')];
   d.rows.forEach(r=>{
     const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
     lines.push([r.s.name,r.base!=null?r.base:'',r.att.exp.toFixed(1),r.att.pres.toFixed(1),pct+'%',
       r.attPay!=null?r.attPay:'',r.missedSlots,r.entryCut?-r.entryCut:0,r.targetCut?-r.targetCut:0,
       r.onb||'not marked',r.onbCut?-r.onbCut:0,r.incAmount||0,
-      r.att.otHours||0,r.otEligible?r.otPay:0,r.finalPay!=null?r.finalPay:''].map(q).join(','));
+      r.att.leaveDays||0,r.att.otHours||0,r.otEligible?r.otPay:0,r.finalPay!=null?r.finalPay:''].map(q).join(','));
   });
   const tot=d.rows.reduce((a,r)=>a+(r.finalPay||0),0);
-  lines.push(['TOTAL','','','','','','','','','','','','',
+  lines.push(['TOTAL','','','','','','','','','','','','','',
     d.rows.reduce((a,r)=>a+(r.otEligible?r.otPay:0),0),tot].map(q).join(','));
   lines.push('');
   lines.push(q(`Period ${d.monthStart} to ${d.countEnd} · ${d.days.length} working days · Sundays and public holidays excluded`));
@@ -2424,7 +2473,7 @@ function renderMySalary(){
     <div class="ct">💰 ${escapeHtml(me.name)} — ${month}</div>
     <table style="width:100%;border-collapse:collapse">
       ${row('Base salary',r.base.toLocaleString()+' AED')}
-      ${row('Attendance','× '+Math.round(r.attFactor*100)+'%',`${r.att.pres.toFixed(1)} of ${r.att.exp.toFixed(1)} hours${r.att.graced?` · ${r.att.graced} day${r.att.graced===1?'':'s'} credited in full up to ${GRACE_UNTIL}`:''}${r.att.halfDays?` · ${r.att.halfDays} day${r.att.halfDays===1?'':'s'} counted as half — no check-out recorded`:''}`)}
+      ${row('Attendance','× '+Math.round(r.attFactor*100)+'%',`${r.att.pres.toFixed(1)} of ${r.att.exp.toFixed(1)} hours${r.att.graced?` · ${r.att.graced} day${r.att.graced===1?'':'s'} credited in full up to ${GRACE_UNTIL}`:''}${r.att.leaveDays?` · ${r.att.leaveDays} day${r.att.leaveDays===1?'':'s'} on leave`:''}${r.att.halfDays?` · ${r.att.halfDays} day${r.att.halfDays===1?'':'s'} counted as half — no check-out recorded`:''}`)}
       ${row('Pay after attendance',r.attPay.toLocaleString()+' AED')}
       ${row('Missed entries',r.missedSlots+' slot'+(r.missedSlots===1?'':'s'),r.cutsActive?`${ENTRY_CUT} AED each · only counted after ${GRACE_UNTIL}`:'no entry cut this month')}
       ${row('Entry deduction',r.entryCut?'− '+r.entryCut.toLocaleString()+' AED':'0',null,r.entryCut?'var(--red)':'var(--ink3)')}
@@ -2679,6 +2728,54 @@ async function changeExecCode(){
     ['ep-cur','ep-new','ep-con'].forEach(id=>document.getElementById(id).value='');
     toast('Password updated.','ok');
   } catch(e){err.textContent='Update failed: '+e.message;err.style.display='block';}
+}
+
+function renderStaffLeave(){
+  const el=document.getElementById('leave-wrap');if(!el)return;
+  el.innerHTML=(DB.staff||[]).map(st=>{
+    const list=leavesFor(st.id);
+    const onNow=leaveOn(st.id,todayStr());
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <div style="font-weight:800">${escapeHtml(st.name)}
+          ${onNow?`<span class="tag t-pu" style="margin-left:6px">On ${onNow.type} leave until ${onNow.to}</span>`:''}</div>
+      </div>
+      ${list.length?`<table class="stbl" style="margin-bottom:12px"><thead><tr><th>From</th><th>To</th><th>Type</th><th>Days</th><th></th></tr></thead><tbody>
+        ${list.map((l,i)=>`<tr>
+          <td>${l.from}</td><td>${l.to}</td>
+          <td><span class="tag ${l.type==='paid'?'t-ok':'t-late'}">${l.type}</span></td>
+          <td>${Math.round((Date.parse(l.to)-Date.parse(l.from))/86400000)+1}</td>
+          <td><button class="btn btn-danger btn-xs" onclick="removeLeave('${st.id}',${i})">✕</button></td>
+        </tr>`).join('')}
+      </tbody></table>`:'<p style="font-size:12px;color:var(--ink3);margin-bottom:12px">No leave recorded.</p>'}
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div class="f" style="margin:0"><label>From</label><input type="date" id="lv-from-${st.id}" value="${todayStr()}"/></div>
+        <div class="f" style="margin:0"><label>Days</label><input type="number" min="1" max="365" id="lv-days-${st.id}" value="30" style="width:90px"/></div>
+        <div class="f" style="margin:0"><label>Type</label><select id="lv-type-${st.id}" style="width:auto">
+          <option value="paid">Paid</option><option value="unpaid">Unpaid</option></select></div>
+        <button class="btn btn-primary btn-sm" onclick="addLeave('${st.id}')">＋ Add leave</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function addLeave(staffId){
+  const from=document.getElementById('lv-from-'+staffId).value;
+  const days=parseInt(document.getElementById('lv-days-'+staffId).value,10);
+  const type=document.getElementById('lv-type-'+staffId).value;
+  if(!from||!days||days<1){toast('Pick a start date and number of days.','err');return;}
+  const list=leavesFor(staffId);
+  list.push({from,to:leaveEnd(from,days),type});
+  list.sort((a,b)=>a.from.localeCompare(b.from));
+  try{await saveLeaves(staffId,list);renderStaffLeave();toast('Leave recorded.','ok');}
+  catch(e){toast('Could not save: '+e.message,'err');}
+}
+async function removeLeave(staffId,idx){
+  const list=leavesFor(staffId);
+  if(!list[idx])return;
+  if(!confirm(`Remove leave ${list[idx].from} → ${list[idx].to}?`))return;
+  list.splice(idx,1);
+  try{await saveLeaves(staffId,list);renderStaffLeave();toast('Leave removed.','ok');}
+  catch(e){toast('Could not save: '+e.message,'err');}
 }
 
 // HR password lives in the config tab under `hrCode`, written through the
