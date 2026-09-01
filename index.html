@@ -878,7 +878,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v39';
+const APP_VERSION='v40';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1274,6 +1274,11 @@ function editWindowOpen(){return todayStr()<=EDIT_WINDOW.lastDay;}
 // into a single shared attendance row, so most of the team has no record for
 // those days and has to re-enter it.
 const ATTN_WINDOW={from:'2026-08-01', to:'2026-08-07', lastDay:'2026-08-08', closeMins:19*60, closeLabel:'7:00 PM'};
+// Check-out closes at 9:00 PM Dubai. After that the button is gone and the
+// day is left without a check-out — which the salary rule counts as half a
+// day. Late finishes are recorded as overtime instead.
+const CHECKOUT_CLOSE=21*60, CHECKOUT_CLOSE_LABEL='9:00 PM';
+function checkoutOpen(){return dubaiMinutes()<CHECKOUT_CLOSE;}
 function attnWindowOpen(){
   const t=todayStr();
   if(t<ATTN_WINDOW.lastDay) return true;
@@ -1883,7 +1888,11 @@ function renderMyAttendance(){
         ${!rec||!rec.checkIn
           ?`<button class="btn btn-primary" id="btn-checkin" onclick="attnCheckIn()">🟢 Check In</button>`
           :`<span class="tag t-ok">🟢 In at ${rec.checkIn}</span>`}
-        ${rec&&rec.checkIn&&!rec.checkOut?`<button class="btn btn-danger" id="btn-checkout" onclick="attnCheckOut()">🔴 Check Out</button>`:''}
+        ${rec&&rec.checkIn&&!rec.checkOut
+          ?(checkoutOpen()
+            ?`<button class="btn btn-danger" id="btn-checkout" onclick="attnCheckOut()">🔴 Check Out</button>`
+            :`<span class="tag t-late">🔒 Check-out closed at ${CHECKOUT_CLOSE_LABEL}</span>`)
+          :''}
         ${rec&&rec.checkOut?`<span class="tag t-late">🔴 Out at ${rec.checkOut}</span><span class="tag t-pu">${attnHoursWorked(rec).toFixed(1)}h worked</span>`:''}
       </div>`}
   </div>`;
@@ -1969,6 +1978,10 @@ async function attnCheckIn(){
     'Checked in ✅', r=>!!(r&&r.checkIn));
 }
 async function attnCheckOut(){
+  if(!checkoutOpen()){
+    toast(`Check-out closed at ${CHECKOUT_CLOSE_LABEL}. Ask the executive to record it for you.`,'err');
+    return;
+  }
   return attnSave('attnCheckOut',
     {staffId:session.user.id,staffName:session.user.name,date:todayStr(),checkOut:nowTime()},
     'Checked out ✅', r=>!!(r&&r.checkOut));
