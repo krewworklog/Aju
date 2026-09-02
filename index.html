@@ -300,7 +300,8 @@ textarea{resize:vertical;line-height:1.6;}
       <div class="lf"><label>HR Password</label><input type="password" id="l-hrcode" placeholder="Enter HR password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
     </div>
     <div class="login-err" id="l-err">Incorrect credentials. Please try again.</div>
-    <button class="btn btn-primary btn-full" style="margin-top:.75rem" onclick="doLogin()">Sign In →</button>
+    <p id="l-progress" style="display:none;font-size:12.5px;color:var(--ink3);margin:10px 0 0;text-align:center"></p>
+    <button class="btn btn-primary btn-full" id="login-btn" style="margin-top:.75rem" onclick="doLogin()">Sign In →</button>
     <p style="font-size:11px;color:var(--ink3);margin-top:1rem;text-align:center"><a href="#" onclick="resetBackend();return false" style="color:var(--ink3)">⚙ Reconfigure backend</a></p>
   </div>
 </div>
@@ -878,7 +879,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v40';
+const APP_VERSION='v41';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1359,11 +1360,33 @@ function setLoginRole(role,el){
   document.getElementById('login-exec').style.display=role==='exec'?'block':'none';
   document.getElementById('login-hr').style.display=role==='hr'?'block':'none';
 }
+// The Sheets backend can take 10s on a good day and stall for far longer on a
+// bad one. Signing in has to load the whole database first, so say so — a
+// silent progress bar for 90 seconds is indistinguishable from a broken app.
+let loginTimer=null;
+function loginBusy(on,msg){
+  const b=document.getElementById('login-btn'), p=document.getElementById('l-progress');
+  if(b){b.disabled=on;b.textContent=on?'Signing in…':'Sign In →';}
+  if(p){p.style.display=on&&msg?'block':'none';if(msg)p.textContent=msg;}
+}
 async function doLogin(){
   const err=document.getElementById('l-err');err.style.display='none';
+  const stages=['Connecting to the server…',
+                'Still connecting — the server is slow today, please wait',
+                'Nearly there — trying once more'];
+  let stage=0;
+  loginBusy(true,stages[0]);
+  clearInterval(loginTimer);
+  loginTimer=setInterval(()=>{stage=Math.min(stage+1,stages.length-1);loginBusy(true,stages[stage]);},9000);
+  const done=()=>{clearInterval(loginTimer);loginBusy(false);};
   try {
     await syncAll();
-  } catch(e){ err.textContent='Could not reach the server — please try again in a moment.'; err.style.display='block'; return; }
+  } catch(e){
+    done();
+    err.textContent='Could not reach the server. It is running slowly right now — wait a moment and try again.';
+    err.style.display='block'; return;
+  }
+  done();
   if(!DB || !DB.staff || !DB.staff.length){
     err.textContent='Could not load accounts — please try again in a moment.'; err.style.display='block'; return;
   }
