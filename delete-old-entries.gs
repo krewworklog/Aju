@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   ██  ONE-OFF — delete June + July 2026 work-log entries
+   ██  ONE-OFF — delete June, July + August 2026 work-log entries
    ██  Paste as a NEW file in the Krew Apps Script project.
    ██  Run previewDelete() first (changes nothing), then runDelete().
    ██  Delete this file afterwards.
@@ -9,9 +9,11 @@
    the daily quota. This does it in a single execution.
    A backup of these entries is on the Desktop:
      krew-entries-june-july-2026-backup.csv / .json
+     krew-entries-august-2026-backup.csv / .json
+     krew-salary-august-2026-FINAL.csv   <- August pay, already calculated
    ═══════════════════════════════════════════════════════════════ */
 
-var DELETE_MONTHS = ['2026-06', '2026-07'];
+var DELETE_MONTHS = ['2026-06', '2026-07', '2026-08'];
 
 function previewDelete() { runJuneJuly_(true); }
 function runDelete()     { runJuneJuly_(false); }
