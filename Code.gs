@@ -38,7 +38,7 @@ const SHEETS = {
   config:   ['key', 'value']
 };
 
-const CODE_VERSION = 'v22-announcements-leaderboard';
+const CODE_VERSION = 'v23-schema-cache-holidays';
 
 const DEFAULT_CLIENTS = ['Baaqat Flowers','Flovia Flowers','8th Cafe','Florens Flowers','Flat Chocolate','Al Rasa','Fedora Perfumes','Elite Party','Hair Salon'];
 const DEFAULT_EXEC_CODE = '99999';
