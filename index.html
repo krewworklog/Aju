@@ -193,6 +193,20 @@ textarea{resize:vertical;line-height:1.6;}
 .bcf{height:100%;border-radius:4px;background:var(--accent);transition:width .6s ease;}
 .bcv{font-size:12px;color:var(--ink3);width:38px;text-align:right;font-family:var(--font);font-weight:700;}
 
+/* Adjustments: what the rule worked out on the left, the override on the right. */
+.adj-grid{display:flex;flex-direction:column;gap:2px;margin-top:10px;}
+.adj-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px 0;border-bottom:1px solid var(--border);}
+.adj-row:last-child{border-bottom:none;}
+.adj-lbl{flex:1;min-width:180px;font-size:13px;font-weight:600;color:var(--ink2);}
+.adj-lbl span{display:block;font-family:var(--font);font-size:11px;font-weight:400;color:var(--ink3);margin-top:2px;}
+.adj-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.adj-ctl input[type=number]{width:96px;}
+.adj-ctl input{margin:0;}
+.adj-unit{font-size:11px;color:var(--ink3);}
+.adj-chk{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink2);cursor:pointer;}
+.adj-chk input{width:auto;margin:0;cursor:pointer;}
+.adj-chk input:disabled{cursor:not-allowed;opacity:.4;}
+@media(max-width:640px){.adj-row{gap:8px}.adj-lbl{min-width:100%}}
 .stbl,.etbl{width:100%;border-collapse:collapse;font-size:13px;}
 .stbl th,.etbl th{text-align:left;font-family:var(--font);font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:8px 12px;border-bottom:1px solid var(--border2);}
 .stbl td,.etbl td{padding:10px 12px;border-bottom:1px solid var(--border);}
@@ -368,6 +382,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-staff',this)"><span class="nav-ic">👤</span>By Staff</div>
         <div class="nav" onclick="gp('exec-compliance',this)"><span class="nav-ic">🚨</span>Compliance</div>
         <div class="nav" onclick="gp('exec-salary',this)"><span class="nav-ic">💰</span>Salary</div>
+        <div class="nav" onclick="gp('exec-adjust',this)"><span class="nav-ic">⚖️</span>Adjustments<span class="nbadge amber" id="b-exec-adjust" style="display:none">0</span></div>
         <div class="nav" onclick="gp('exec-increment',this)"><span class="nav-ic">📈</span>Increment Program</div>
         <div class="nav" onclick="gp('exec-attendance',this)"><span class="nav-ic">🕘</span>Attendance</div>
         <div class="sbl">Team</div>
@@ -565,6 +580,17 @@ textarea{resize:vertical;line-height:1.6;}
         <div id="sal-banner"></div>
         <div class="card"><div class="ct">Salary Calculation</div><div id="sal-table"></div></div>
         <div id="sal-leads"></div>
+      </div>
+
+      <!-- EXEC: SALARY & ATTENDANCE ADJUSTMENTS -->
+      <div class="page" id="page-exec-adjust">
+        <div class="ph"><div><div class="pt">Adjustments</div><p class="ps">Override what the rules worked out. The automatic figure is always shown next to your change, so the salary report keeps a record of what was calculated and what you decided.</p></div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+          <label style="font-size:12px;color:var(--ink3)">Month</label>
+          <input type="month" id="adj-month" onchange="renderExecAdjust()" style="width:auto"/>
+          <span style="font-size:12px;color:var(--ink3)">· changes apply to the salary report immediately</span>
+        </div>
+        <div id="adj-list"></div>
       </div>
 
       <!-- MANAGER: INCREMENT PROGRAM -->
@@ -879,7 +905,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v41';
+const APP_VERSION='v42';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1164,6 +1190,42 @@ function onboardState(month,staffId){return String((DB.config||{})[onboardKey(mo
 async function setOnboard(staffId,month,val){
   try{await api('setConfigKey',{key:onboardKey(month,staffId),value:val});await syncAll();renderExecSalary();toast('Onboarding updated.','ok');}
   catch(e){toast('Failed: '+e.message,'err');}
+}
+
+// ── Salary adjustments ───────────────────────────────────────
+// The rules work out a figure; the executive sometimes needs to overrule it —
+// someone was at a client site and could not tap in, a target was missed for a
+// reason outside their control, a bonus is owed. Adjustments sit ON TOP of the
+// calculation rather than replacing it: the automatic number is kept and shown
+// beside the override, so the salary report always says both what the rule
+// produced and what a person decided. Stored per staff per month in config as
+// JSON, through the existing setConfigKey action — no backend change needed.
+//   attnHours   hours credited back to "present" (attendance cut softened)
+//   entryCut    replaces the missed-entry cut in AED; 0 waives it entirely
+//   waiveTarget drop the lead-target cut
+//   waiveOnb    drop the onboarding cut
+//   other       ± AED applied at the very end (bonus positive, penalty negative)
+//   note        why — carried into the salary CSV and shown to the staff member
+function adjKey(month,staffId){return 'adj-'+month+'-'+staffId;}
+function adjFor(month,staffId){
+  const raw=(DB.config||{})[adjKey(month,staffId)];
+  if(!raw)return null;
+  try{const o=JSON.parse(raw);return (o&&typeof o==='object')?o:null;}catch(e){return null;}
+}
+function adjIsEmpty(a){
+  if(!a)return true;
+  return !(parseFloat(a.attnHours)||0)&&(a.entryCut==null||a.entryCut==='')
+    &&!a.waiveTarget&&!a.waiveOnb&&!(parseFloat(a.other)||0)&&!String(a.note||'').trim();
+}
+async function saveAdj(month,staffId,obj){
+  const val=adjIsEmpty(obj)?'':JSON.stringify(obj);
+  await api('setConfigKey',{key:adjKey(month,staffId),value:val});
+  await syncAll();
+}
+// How many staff carry an adjustment this month — drives the sidebar badge.
+function adjCountForMonth(month){
+  return (DB.staff||[]).concat(execBaseSalary()!=null?[EXEC_STAFF]:[])
+    .filter(s=>!adjIsEmpty(adjFor(month,s.id))).length;
 }
 
 // ── Leave ────────────────────────────────────────────────────
@@ -1464,6 +1526,7 @@ function gp(id,el){
     'mgr-sales':renderMgrSales,
     'exec-compliance':renderExecCompliance,
     'exec-salary':renderExecSalary,
+    'exec-adjust':renderExecAdjust,
     'my-salary':renderMySalary,
     'exec-attendance':renderExecAttendance,
     'my-increment':renderMyIncrement,
@@ -2104,10 +2167,20 @@ function salaryRowFor(s,month,days,monthOver){
     missedSlots+=Math.max(0,2-n);
   });
   const att=attnMonthlyForSalary(s,days,month);
+  // Executive adjustments ride on top of the rules. Every automatic figure is
+  // kept alongside the override so the report can show both.
+  const adj=adjFor(month,s.id)||{};
+  const presAuto=att.pres;
+  const creditH=Math.max(0,parseFloat(adj.attnHours)||0);
+  if(creditH){att.credited=creditH;att.pres=Math.min(att.exp,att.pres+creditH);}
   const attFactor=(attnActive&&att.exp>0)?Math.min(1,att.pres/att.exp):1;
+  const attFactorAuto=(attnActive&&att.exp>0)?Math.min(1,presAuto/att.exp):1;
   const attPay=base!=null?Math.round(base*attFactor):null;
+  const attPayAuto=base!=null?Math.round(base*attFactorAuto):null;
   // The executive files no work-log entries, so entry deductions cannot apply.
-  const entryCut=(!isExec&&cutsActive&&base!=null)?missedSlots*ENTRY_CUT:0;
+  const entryCutAuto=(!isExec&&cutsActive&&base!=null)?missedSlots*ENTRY_CUT:0;
+  const entryOverridden=adj.entryCut!=null&&adj.entryCut!=='';
+  const entryCut=entryOverridden?Math.max(0,parseFloat(adj.entryCut)||0):entryCutAuto;
   let targetCut=0;
   const targets=targetsFor(s.name).map(t=>{
     const ok=leadsForTarget(t.id,month).length;
@@ -2115,11 +2188,14 @@ function salaryRowFor(s,month,days,monthOver){
     if(!isExec&&!done&&monthOver&&base!=null)targetCut+=Math.round(base*TARGET_CUT_PCT/100);
     return {t,ok,done};
   });
+  const targetCutAuto=targetCut;
+  if(adj.waiveTarget)targetCut=0;
   // Onboarding: the executive signs off once a month. An explicit "no" bites
   // immediately; leaving it unmarked only bites once the month has closed, so
   // nobody is docked for a review that simply has not happened yet.
   const onb=onboardState(month,s.id);
-  const onbCut=(!isExec&&base!=null&&onb!=='yes'&&(onb==='no'||monthOver))?Math.round(base*ONBOARD_CUT_PCT/100):0;
+  const onbCutAuto=(!isExec&&base!=null&&onb!=='yes'&&(onb==='no'||monthOver))?Math.round(base*ONBOARD_CUT_PCT/100):0;
+  const onbCut=adj.waiveOnb?0:onbCutAuto;
   const enrolled=!!incMemberFor(s.id);
   const assess=enrolled?incAssess(s,month):null;
   const incQualified=!!(assess&&assess.qualified);
@@ -2128,9 +2204,14 @@ function salaryRowFor(s,month,days,monthOver){
   const otEligible=!OT_EXCLUDED.includes(s.name)&&month>=OT_PAY_START&&base!=null&&att.exp>0;
   const otRate=otEligible?(base/att.exp)*OT_MULTIPLIER:0;
   const otPay=otEligible?Math.round(att.otHours*otRate):0;
-  const finalPay=base!=null?attPay-entryCut-targetCut-onbCut+incAmount+otPay:null;
+  const other=parseFloat(adj.other)||0;
+  const finalPay=base!=null?attPay-entryCut-targetCut-onbCut+incAmount+otPay+other:null;
+  const finalPayAuto=base!=null?attPayAuto-entryCutAuto-targetCutAuto-onbCutAuto+incAmount+otPay:null;
+  const adjusted=!adjIsEmpty(adj);
   return {s,base,att,attFactor,attPay,missedSlots,entryCut,targets,targetCut,onb,onbCut,
-          enrolled,assess,incQualified,incAmount,otEligible,otRate,otPay,finalPay,cutsActive,attnActive};
+          enrolled,assess,incQualified,incAmount,otEligible,otRate,otPay,finalPay,cutsActive,attnActive,
+          adj,adjusted,other,presAuto,attPayAuto,entryCutAuto,entryOverridden,
+          targetCutAuto,onbCutAuto,finalPayAuto};
 }
 // Only the executive can set their own base salary. HR sees the resulting row
 // on the report but gets no control to change it.
@@ -2164,6 +2245,132 @@ async function saveExecSalary(){
   }catch(e){if(err){err.textContent='Could not save: '+e.message;err.style.display='block';}}
 }
 
+// ── Adjustments page ─────────────────────────────────────────
+// One card per person. Each row shows what the rule worked out on the left and
+// the control to overrule it on the right, so the executive is never editing a
+// number without seeing where it came from.
+function renderExecAdjust(){
+  const mEl=document.getElementById('adj-month');if(!mEl)return;
+  if(!mEl.value)mEl.value=todayStr().slice(0,7);
+  const month=mEl.value;
+  const monthStart=month+'-01';
+  const end=new Date(Date.parse(monthStart+'T00:00:00Z'));
+  end.setUTCMonth(end.getUTCMonth()+1);end.setUTCDate(0);
+  const monthEnd=end.toISOString().slice(0,10);
+  const yesterday=localDateStr(new Date(Date.now()-86400000));
+  const monthOver=todayStr()>monthEnd;
+  const countEnd=monthOver?monthEnd:(yesterday<monthEnd?yesterday:monthEnd);
+  const days=salaryDays(month,countEnd);
+  const people=[...DB.staff];
+  if(execBaseSalary()!=null)people.push(EXEC_STAFF);
+  const host=document.getElementById('adj-list');
+  if(!people.length){host.innerHTML='<div class="card"><p style="color:var(--ink3);font-size:13px">No staff accounts yet.</p></div>';return;}
+  const rows=people.map(s=>salaryRowFor(s,month,days,monthOver));
+  const changed=rows.filter(r=>r.adjusted).length;
+  const swing=rows.reduce((a,r)=>a+((r.finalPay||0)-(r.finalPayAuto||0)),0);
+  host.innerHTML=`
+  ${changed?`<div class="info-banner" style="background:var(--amber-b);border-color:rgba(245,158,11,.25);color:var(--amber);margin-bottom:1rem;padding:12px 16px;font-size:13px"><span>⚖️</span><span>${changed} ${changed===1?'person has':'people have'} an adjustment this month, worth ${swing>=0?'+':'−'}${Math.abs(swing).toLocaleString()} AED in total. Every one of them is marked on the salary report and in the CSV.</span></div>`:''}
+  ${rows.map(r=>{
+    const a=r.adj||{};
+    const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
+    const pctAuto=r.att.exp>0?Math.round(r.presAuto/r.att.exp*100):100;
+    const id=r.s.id;
+    const noBase=r.base==null;
+    return `<div class="card" style="${r.adjusted?'border-color:rgba(245,158,11,.4)':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+        <div class="ct" style="margin-bottom:0">${escapeHtml(r.s.name)}${r.adjusted?' <span class="tag t-pu" style="margin-left:6px">adjusted</span>':''}</div>
+        <div style="font-size:12px;color:var(--ink3)">
+          ${noBase?'<span style="color:var(--amber)">No base salary set</span>':
+            `Rules say <strong style="color:var(--ink2)">${r.finalPayAuto.toLocaleString()}</strong>${r.adjusted?` → paying <strong style="color:var(--green)">${r.finalPay.toLocaleString()}</strong>`:''} AED`}
+        </div>
+      </div>
+      ${noBase?'<p style="font-size:12px;color:var(--ink3)">Set a base salary before adjusting this row.</p>':`
+      <div class="adj-grid">
+
+        <div class="adj-row">
+          <div class="adj-lbl">Attendance<span>${pctAuto}% — ${r.presAuto.toFixed(1)} of ${r.att.exp.toFixed(1)}h${r.att.credited?` · now ${pct}%`:''}</span></div>
+          <div class="adj-ctl">
+            <input type="number" min="0" step="0.5" id="adj-h-${id}" value="${a.attnHours||''}" placeholder="0"/>
+            <span class="adj-unit">hours credited back</span>
+          </div>
+        </div>
+
+        <div class="adj-row">
+          <div class="adj-lbl">Missed-entry cut<span>${r.missedSlots} missed × ${ENTRY_CUT} = ${r.entryCutAuto.toLocaleString()} AED</span></div>
+          <div class="adj-ctl">
+            <input type="number" min="0" step="1" id="adj-e-${id}" value="${r.entryOverridden?a.entryCut:''}" placeholder="${r.entryCutAuto}"/>
+            <span class="adj-unit">AED — blank keeps the rule</span>
+            <button class="btn btn-ghost btn-xs" onclick="document.getElementById('adj-e-${id}').value=0">Waive</button>
+          </div>
+        </div>
+
+        <div class="adj-row">
+          <div class="adj-lbl">Lead-target cut<span>${r.targetCutAuto?r.targetCutAuto.toLocaleString()+' AED':'none applied'}</span></div>
+          <div class="adj-ctl">
+            <label class="adj-chk"><input type="checkbox" id="adj-t-${id}" ${a.waiveTarget?'checked':''} ${r.targetCutAuto?'':'disabled'}/> Waive it</label>
+          </div>
+        </div>
+
+        <div class="adj-row">
+          <div class="adj-lbl">Onboarding cut<span>${r.onbCutAuto?r.onbCutAuto.toLocaleString()+' AED':'none applied'}</span></div>
+          <div class="adj-ctl">
+            <label class="adj-chk"><input type="checkbox" id="adj-o-${id}" ${a.waiveOnb?'checked':''} ${r.onbCutAuto?'':'disabled'}/> Waive it</label>
+          </div>
+        </div>
+
+        <div class="adj-row">
+          <div class="adj-lbl">Anything else<span>Bonus as a positive number, penalty as a negative</span></div>
+          <div class="adj-ctl">
+            <input type="number" step="1" id="adj-x-${id}" value="${a.other||''}" placeholder="0"/>
+            <span class="adj-unit">AED</span>
+          </div>
+        </div>
+
+        <div class="adj-row">
+          <div class="adj-lbl">Reason<span>Shown on the salary report, in the CSV, and to ${escapeHtml(r.s.name.split(' ')[0])}</span></div>
+          <div class="adj-ctl">
+            <input type="text" id="adj-n-${id}" value="${escapeHtml(a.note||'')}" maxlength="120" placeholder="e.g. on site at Baaqat, could not tap in" style="flex:1;min-width:180px"/>
+          </div>
+        </div>
+
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="saveAdjRow('${month}','${id}')">Save</button>
+        ${r.adjusted?`<button class="btn btn-ghost btn-sm" onclick="clearAdjRow('${month}','${id}','${escapeHtml(r.s.name)}')">Clear adjustment</button>`:''}
+      </div>`}
+    </div>`;}).join('')}
+  <p style="font-size:11px;color:var(--ink3);margin-top:4px">Over ${days.length} working days (${monthStart} → ${countEnd}). Adjustments never change the underlying attendance or work-log records — those stay exactly as they were logged.</p>`;
+  const b=document.getElementById('b-exec-adjust');
+  if(b){const n=adjCountForMonth(todayStr().slice(0,7));b.textContent=n;b.style.display=n?'':'none';}
+}
+async function saveAdjRow(month,staffId){
+  const g=id=>document.getElementById(id);
+  const h=g('adj-h-'+staffId),e=g('adj-e-'+staffId),t=g('adj-t-'+staffId),
+        o=g('adj-o-'+staffId),x=g('adj-x-'+staffId),n=g('adj-n-'+staffId);
+  const obj={
+    attnHours:parseFloat(h.value)||0,
+    entryCut:e.value===''?null:Math.max(0,parseFloat(e.value)||0),
+    waiveTarget:!!(t&&t.checked),
+    waiveOnb:!!(o&&o.checked),
+    other:parseFloat(x.value)||0,
+    note:String(n.value||'').trim()
+  };
+  if(!adjIsEmpty(obj)&&!obj.note){toast('Add a reason — it goes on the salary report.','err');n.focus();return;}
+  try{
+    await saveAdj(month,staffId,obj);
+    renderExecAdjust();
+    toast(adjIsEmpty(obj)?'Adjustment cleared.':'Adjustment saved.','ok');
+  }catch(err){toast('Could not save: '+err.message,'err');}
+}
+async function clearAdjRow(month,staffId,name){
+  if(!confirm(`Remove the adjustment for ${name}? Their pay goes back to what the rules work out.`))return;
+  try{
+    await saveAdj(month,staffId,{});
+    renderExecAdjust();
+    toast('Adjustment cleared.','ok');
+  }catch(err){toast('Could not clear: '+err.message,'err');}
+}
+
 // Final salary report as CSV — what HR actually pays from. Built from the same
 // rows the table renders, so the file can never disagree with the screen.
 function downloadSalaryReport(){
@@ -2172,18 +2379,25 @@ function downloadSalaryReport(){
   const q=v=>{const t=String(v==null?'':v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;};
   const head=['Staff','Base (AED)','Expected hours','Hours present','Attendance %','Attendance pay',
               'Missed entries','Entry cut','Target cut','Onboarding','Onboarding cut','Increment',
-              'Leave days','Overtime hours','Overtime pay','Final pay (AED)'];
+              'Leave days','Overtime hours','Overtime pay',
+              'Pay by the rules','Executive adjustment','Reason for adjustment','Final pay (AED)'];
   const lines=[head.join(',')];
   d.rows.forEach(r=>{
     const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
+    const swing=(r.finalPay||0)-(r.finalPayAuto||0);
     lines.push([r.s.name,r.base!=null?r.base:'',r.att.exp.toFixed(1),r.att.pres.toFixed(1),pct+'%',
       r.attPay!=null?r.attPay:'',r.missedSlots,r.entryCut?-r.entryCut:0,r.targetCut?-r.targetCut:0,
       r.onb||'not marked',r.onbCut?-r.onbCut:0,r.incAmount||0,
-      r.att.leaveDays||0,r.att.otHours||0,r.otEligible?r.otPay:0,r.finalPay!=null?r.finalPay:''].map(q).join(','));
+      r.att.leaveDays||0,r.att.otHours||0,r.otEligible?r.otPay:0,
+      r.finalPayAuto!=null?r.finalPayAuto:'',r.adjusted?swing:0,
+      r.adjusted?(r.adj.note||''):'',
+      r.finalPay!=null?r.finalPay:''].map(q).join(','));
   });
   const tot=d.rows.reduce((a,r)=>a+(r.finalPay||0),0);
+  const totAuto=d.rows.reduce((a,r)=>a+(r.finalPayAuto||0),0);
   lines.push(['TOTAL','','','','','','','','','','','','','',
-    d.rows.reduce((a,r)=>a+(r.otEligible?r.otPay:0),0),tot].map(q).join(','));
+    d.rows.reduce((a,r)=>a+(r.otEligible?r.otPay:0),0),
+    totAuto,tot-totAuto,'',tot].map(q).join(','));
   lines.push('');
   lines.push(q(`Period ${d.monthStart} to ${d.countEnd} · ${d.days.length} working days · Sundays and public holidays excluded`));
   lines.push(q(`Overtime paid at ${OT_MULTIPLIER}x hourly${OT_EXCLUDED.length?' (excluded: '+OT_EXCLUDED.join('; ')+')':''}`));
@@ -2519,6 +2733,7 @@ function renderMySalary(){
       ${row('Client onboarding',onboardTag(r.onb,monthOver),'signed off by the executive')}
       ${row('Onboarding deduction',r.onbCut?'− '+r.onbCut.toLocaleString()+' AED':'0',ONBOARD_CUT_PCT+'% if onboarding is not complete',r.onbCut?'var(--red)':'var(--ink3)')}
       ${r.enrolled?row('Increment',r.incQualified?'+ '+r.incAmount.toLocaleString()+' AED':'not met this month',null,r.incQualified?'var(--green)':'var(--ink3)'):''}
+      ${r.adjusted?row('Executive adjustment',(r.finalPay>=r.finalPayAuto?'+ ':'− ')+Math.abs(r.finalPay-r.finalPayAuto).toLocaleString()+' AED',escapeHtml(r.adj.note||'')||'no reason recorded',r.finalPay>=r.finalPayAuto?'var(--green)':'var(--red)'):''}
       <tr><td style="padding:14px 0 0;border-top:1px solid var(--line,rgba(0,0,0,.12));font-weight:800">Take-home this month</td>
           <td style="padding:14px 0 0;border-top:1px solid var(--line,rgba(0,0,0,.12));text-align:right;font-family:var(--font);font-weight:800;font-size:18px;color:${r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay.toLocaleString()} AED</td></tr>
     </table>
@@ -2563,9 +2778,10 @@ function renderExecSalary(){
   const totBase=rows.reduce((a,r)=>a+(r.base||0),0);
   const totFinal=rows.reduce((a,r)=>a+(r.finalPay||0),0);
   const totOt=rows.reduce((a,r)=>a+(r.otPay||0),0);
+  const totAdj=rows.reduce((a,r)=>a+((r.finalPay||0)-(r.finalPayAuto||0)),0);
   window.__salRows={rows,month,days,monthStart,countEnd};   // for the CSV export
   document.getElementById('sal-table').innerHTML=`
-    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Onboarding</th><th>Onb. cut</th><th>Increment</th><th>Overtime</th><th>Final (AED)</th></tr></thead><tbody>
+    <table class="stbl"><thead><tr><th>Staff</th><th>Base (AED)</th><th>Attendance</th><th>Attend. pay</th><th>Missed entries</th><th>Entry cut</th><th>Lead target</th><th>Target cut</th><th>Onboarding</th><th>Onb. cut</th><th>Increment</th><th>Overtime</th><th>Adjustment</th><th>Final (AED)</th></tr></thead><tbody>
     ${rows.map(r=>{
       const pct=r.att.exp>0?Math.round(r.att.pres/r.att.exp*100):100;
       return `<tr>
@@ -2585,9 +2801,10 @@ function renderExecSalary(){
       <td style="color:${r.onbCut?'var(--red)':'var(--ink3)'}">${r.onbCut?'−'+r.onbCut.toLocaleString():'0'}</td>
       <td>${!r.enrolled?'<span style="color:var(--ink3)">—</span>':(r.incQualified?`<span class="tag t-ok">+${r.incAmount.toLocaleString()}</span>`:'<span class="tag t-pu">not met</span>')}</td>
       <td>${!r.att.otHours?'<span style="color:var(--ink3)">—</span>':(r.otEligible?`<span class="tag t-ok">+${r.otPay.toLocaleString()}</span> <span style="font-size:11px;color:var(--ink3)">${r.att.otHours}h</span>`:`<span class="tag t-pu">${r.att.otHours}h unpaid</span>`)}</td>
+      <td>${!r.adjusted?'<span style="color:var(--ink3)">—</span>':`<span class="tag t-pu" title="${escapeHtml(r.adj.note||'')}">${r.finalPay>=r.finalPayAuto?'+':'−'}${Math.abs(r.finalPay-r.finalPayAuto).toLocaleString()}</span>`}</td>
       <td style="font-family:var(--font);font-weight:800;color:${r.finalPay!=null&&r.finalPay<r.base?'var(--amber)':'var(--green)'}">${r.finalPay!=null?r.finalPay.toLocaleString():'—'}</td>
-    </tr>`;}).join('')}
-    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totOt?'+'+totOt.toLocaleString():''}</td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
+    </tr>${r.adjusted?`<tr><td colspan="14" style="padding:6px 12px 10px;border-bottom:1px solid var(--border);font-size:12px;color:var(--amber);background:var(--amber-b)">⚖️ Adjusted by the executive — rules worked out ${r.finalPayAuto.toLocaleString()} AED. ${escapeHtml(r.adj.note||'No reason recorded.')}</td></tr>`:''}`;}).join('')}
+    <tr><td style="font-weight:800">Total</td><td>${totBase.toLocaleString()}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td style="font-family:var(--font);font-weight:800">${totOt?'+'+totOt.toLocaleString():''}</td><td style="font-family:var(--font);font-weight:800">${totAdj?(totAdj>0?'+':'−')+Math.abs(totAdj).toLocaleString():''}</td><td style="font-family:var(--font);font-weight:800">${totFinal.toLocaleString()}</td></tr>
     </tbody></table>
     <p style="font-size:11px;color:var(--ink3);margin-top:10px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays off). Attendance pay = base × (hours present ÷ expected). Missed entries: each of the 2 daily slots counts once, at ${ENTRY_CUT} AED. Increment = +${incRaisePct()}% for enrolled staff who met all three programme targets.</p>`;
   document.getElementById('sal-leads').innerHTML=LEAD_TARGETS.map(t=>{
@@ -3097,6 +3314,11 @@ function updateBadges(){
   const bSl=document.getElementById('b-sales');if(bSl)bSl.textContent=(DB.leads||[]).filter(l=>!l.salesStatus).length;
   const bMC=document.getElementById('b-mgr-codes');if(bMC)bMC.textContent=mineCodes;
   const bEC=document.getElementById('b-exec-codes');if(bEC)bEC.textContent=activeCodes;
+  // Adjustments badge counts people overruled in the CURRENT month, so the
+  // executive can see at a glance that this month's payroll is not purely
+  // rule-driven. Hidden entirely when nothing has been changed.
+  const bEA=document.getElementById('b-exec-adjust');
+  if(bEA){const n=adjCountForMonth(todayStr().slice(0,7));bEA.textContent=n;bEA.style.display=n?'':'none';}
   const bER=document.getElementById('b-exec-reports');if(bER)bER.textContent=(DB.reports||[]).length;
   // One badge per sidebar, so it is addressed by class rather than id.
   const annCount=((DB.announcements)||[]).filter(a=>a.active).length;
