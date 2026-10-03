@@ -411,7 +411,7 @@ textarea{resize:vertical;line-height:1.6;}
     <main class="content">
       <!-- STAFF: LOG WORK -->
       <div class="page active" id="page-log">
-        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Log twice a day — Entry 1 by 3:00 PM and Entry 2 by 7:30 PM (Dubai time). Each client entry needs a PNG proof screenshot.</p></div></div>
+        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Log twice a day — Entry 1 by 3:00 PM and Entry 2 by 7:30 PM (Dubai time).</p></div></div>
         <div class="card"><div class="ct">Which entry are you logging?</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap" id="entry-tabs">
             <button type="button" class="entry-tab" id="entry-tab-1" onclick="setEntry(1)">Entry 1<span class="et-sub" id="et-sub-1">Due 3:00 PM</span></button>
@@ -605,7 +605,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- EXEC: ATTENDANCE -->
       <div class="page" id="page-exec-attendance">
-        <div class="ph"><div><div class="pt">Attendance</div><p class="ps">Hours worked vs expected (Mon–Fri 9h, Sat 6.5h, Sun off), overtime, and daily check-in/out records.</p></div></div>
+        <div class="ph"><div><div class="pt">Attendance</div><p class="ps">Hours worked vs expected (Mon–Fri 9h, Sat 4h, Sun off), overtime, and daily check-in/out records.</p></div></div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
           <label style="font-size:12px;color:var(--ink3)">Month</label>
           <input type="month" id="attn-month" onchange="renderExecAttendance()" style="width:auto"/>
@@ -905,7 +905,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v42';
+const APP_VERSION='v43';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1039,7 +1039,8 @@ const SERVICES=['Insta & Facebook','Snapchat','TikTok','Performance Marketing','
 function clientServicesFor(name){return (DB.clientServices&&DB.clientServices[name])||[];}
 
 // ── Attendance / HR ──────────────────────────────────────────
-// Office hours: Mon–Fri 10:00–19:00 (9h), Sat 10:00–16:30 (6.5h), Sun off.
+// Office hours: Mon–Fri 10:00–19:00 (9h), Sat 10:00–14:00 (4h), Sun off.
+// Saturdays ran 10:00–16:30 (6.5h) until Sep 2026; past months keep that.
 // Attendance affects pay proportionally from this month onward (no back-charge
 // for months before staff were checking in).
 const ATTENDANCE_START='2026-08';
@@ -1048,11 +1049,15 @@ const ATTENDANCE_START='2026-08';
 const HOLIDAYS={'2026-08-28':'Public holiday'};
 function isHoliday(dateStr){return !!HOLIDAYS[String(dateStr).slice(0,10)];}
 function holidayName(dateStr){return HOLIDAYS[String(dateStr).slice(0,10)]||'';}
+const SAT_SHORT_FROM='2026-10-01';
+// Saturday closing time in minutes-of-day: 14:00 from Oct 2026, 16:30 before.
+function satEnd(dateStr){return String(dateStr).slice(0,10)>=SAT_SHORT_FROM ? 14*60 : 16*60+30;}
+function satEndLabel(dateStr){return satEnd(dateStr)===14*60?'14:00':'16:30';}
 function expectedHoursForDay(dateStr){
   if(isHoliday(dateStr))return 0;
   const day=new Date(dateStr+'T00:00:00Z').getUTCDay(); // 0 Sun … 6 Sat
   if(day===0)return 0;      // Sunday off
-  if(day===6)return 6.5;    // Saturday 10:00–16:30
+  if(day===6)return (satEnd(dateStr)-10*60)/60;   // Saturday 10:00–14:00 (4h)
   return 9;                 // Mon–Fri 10:00–19:00
 }
 // A day nobody is expected in: Sunday or a public holiday.
@@ -1064,7 +1069,7 @@ function officeHoursLabel(dateStr){
   if(isHoliday(dateStr))return holidayName(dateStr);
   const day=new Date(dateStr+'T00:00:00Z').getUTCDay();
   if(day===0)return 'Day off';
-  if(day===6)return '10:00 – 16:30';
+  if(day===6)return '10:00 – '+satEndLabel(dateStr);
   return '10:00 – 19:00';
 }
 function attnFor(staffId,date){return (DB.attendance||[]).find(a=>String(a.staffId)===String(staffId)&&String(a.date)===String(date));}
@@ -1074,7 +1079,7 @@ function officeWindow(dateStr){
   if(isHoliday(dateStr))return null;
   const day=new Date(dateStr+'T00:00:00Z').getUTCDay();
   if(day===0)return null;
-  return { start:10*60, end: day===6 ? 16*60+30 : 19*60 };
+  return { start:10*60, end: day===6 ? satEnd(dateStr) : 19*60 };
 }
 function attnHoursWorked(a){
   if(!a)return 0;
@@ -1084,7 +1089,7 @@ function attnHoursWorked(a){
   return mins/60;
 }
 // Hours that count toward pay: ONLY time inside the official window
-// (10:00–19:00, Sat 10:00–16:30). Arriving early or staying late never adds,
+// (10:00–19:00, Sat 10:00–14:00). Arriving early or staying late never adds,
 // so a short day can never be compensated on another day.
 function attnPresentHours(a){
   if(!a)return 0;
@@ -1630,7 +1635,6 @@ function addCE(data){
       <div class="f"><label>Service *</label><select class="cr-svc"></select></div>
       <div class="f"><label>Hours *</label><input type="number" class="cr-hr" min="0.5" max="24" step="0.5" placeholder="e.g. 4"/></div>
       <div class="f full"><label>Tasks Completed *</label><textarea class="cr-tk" placeholder="Describe what you worked on..." style="min-height:70px"></textarea></div>
-      <div class="f full"><label>Proof Screenshot (PNG) *</label><input type="file" class="cr-proof" accept="image/png"/><div class="cr-proof-note" style="font-size:12px;color:var(--ink3);margin-top:4px"></div></div>
     </div>`;
   document.getElementById('ce-wrap').appendChild(div);
   const clSel=div.querySelector('.cr-cl'),svSel=div.querySelector('.cr-svc');
@@ -1639,10 +1643,8 @@ function addCE(data){
   clSel.addEventListener('change',()=>buildServiceOpts(svSel,clSel.value));
   if(data){
     div.querySelector('.cr-hr').value=data.hours;div.querySelector('.cr-tk').value=data.tasks;
-    if(data.proofImg){
-      div.dataset.proofUrl=data.proofImg;
-      div.querySelector('.cr-proof-note').innerHTML=`✓ Proof already uploaded — <a href="${encodeURI(data.proofImg)}" target="_blank" rel="noopener" style="color:var(--accent)">view</a>. Choose a new file only to replace it.`;
-    }
+    // Proof uploads are retired; keep an old entry's proof link when it's edited.
+    if(data.proofImg)div.dataset.proofUrl=data.proofImg;
   }
 }
 function getCERows(){
@@ -1651,27 +1653,18 @@ function getCERows(){
     service:row.querySelector('.cr-svc').value,
     hours:parseFloat(row.querySelector('.cr-hr').value)||0,
     tasks:row.querySelector('.cr-tk').value.trim(),
-    proofImg:row.dataset.proofUrl||'',
-    _file:(row.querySelector('.cr-proof').files||[])[0]||null
+    proofImg:row.dataset.proofUrl||''
   }));
 }
-// Reads each row's chosen PNG → resized JPEG base64 for upload; returns
-// {rows, proofs} where rows are clean (no File objects) and proofs go to Drive.
+// Staff no longer upload proof screenshots, so `proofs` is always empty. Rows
+// keep an existing proofImg so editing an old entry doesn't drop its proof.
 async function collectRowsAndProofs(){
-  const raw=getCERows();
-  const rows=[],proofs=[];
-  for(let i=0;i<raw.length;i++){
-    const r=raw[i];
+  const rows=getCERows().map(r=>{
     const row={client:r.client,service:r.service,hours:r.hours,tasks:r.tasks};
     if(r.proofImg)row.proofImg=r.proofImg;
-    if(r._file){
-      if(r._file.type!=='image/png')throw new Error(`Entry #${i+1}: proof must be a PNG image.`);
-      const durl=await fileToResizedDataUrl(r._file);
-      proofs.push({i,imageData:durl.split(',')[1],imageType:'image/jpeg'});
-    }
-    rows.push(row);
-  }
-  return {rows,proofs};
+    return row;
+  });
+  return {rows,proofs:[]};
 }
 
 let submitting=false;
@@ -1687,7 +1680,6 @@ async function submitLog(){
     if(!r.service){toast(`Entry #${i+1}: choose a service (or "Other").`,'err');return;}
     if(!r.hours||r.hours<=0){toast('Enter hours for each entry.','err');return;}
     if(!r.tasks){toast('Enter tasks for each entry.','err');return;}
-    if(!r._file&&!r.proofImg){toast(`Entry #${i+1}: upload a PNG proof screenshot of the work done.`,'err');return;}
   }
   let rows,proofs;
   try {({rows,proofs}=await collectRowsAndProofs());}
@@ -2042,18 +2034,29 @@ async function attnSaveFix(){
 // re-sync and look at what the server actually holds. Getting this wrong is
 // what left staff staring at a Check In button they had already pressed.
 let attnBusy=false;
+const ATTN_ROUNDS=3, ATTN_RETRY_MS=5000;   // waits 5s, then 10s
 async function attnSave(action,payload,okMsg,landed){
   if(attnBusy)return;                       // no pile-ups from repeated taps
   attnBusy=true;
   ['btn-checkin','btn-checkout'].forEach(id=>{const b=document.getElementById(id);if(b){b.disabled=true;b.textContent='Saving…';}});
   try{
+    // api() already retries quickly (0.5s apart), but Google outages can last
+    // longer than that. So if the save hasn't landed, wait and try the whole
+    // round again — up to ATTN_ROUNDS times — before telling anyone it failed.
+    // Safe to repeat: the backend upserts one row per staff per day.
     let threw=null;
-    try{ await api(action,payload); }catch(e){ threw=e; }
-    // Always re-read the server, whether or not the call reported success.
-    try{ await syncAll(); }catch(_){}
-    const rec=attnFor(session.user.id,todayStr());
+    for(let round=1; round<=ATTN_ROUNDS; round++){
+      threw=null;
+      try{ await api(action,payload); }catch(e){ threw=e; }
+      // Always re-read the server, whether or not the call reported success.
+      try{ await syncAll(); }catch(_){}
+      if(landed(attnFor(session.user.id,todayStr()))){ renderMyAttendance(); toast(okMsg,'ok'); return; }
+      if(round<ATTN_ROUNDS){
+        ['btn-checkin','btn-checkout'].forEach(id=>{const b=document.getElementById(id);if(b)b.textContent='Retrying…';});
+        await new Promise(r=>setTimeout(r, ATTN_RETRY_MS*round));
+      }
+    }
     renderMyAttendance();
-    if(landed(rec)){ toast(okMsg,'ok'); return; }
     toast(threw?'Could not reach the server — nothing was saved. Please try again.'
                :'That did not save. Please try again.','err');
   } finally { attnBusy=false; }
@@ -2448,7 +2451,7 @@ function renderExecAttendance(){
       </tr>`;
     }).join('')}
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:8px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays and public holidays excluded). "Hours worked" counts only time inside official hours (10:00–19:00, Sat 10:00–16:30) — early arrival or staying late never compensates for a short day; extra time goes in the overtime log.</p>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
+    <p style="font-size:11px;color:var(--ink3);margin-top:8px">Over ${days.length} working days (${monthStart} → ${countEnd}, Sundays and public holidays excluded). "Hours worked" counts only time inside official hours (10:00–19:00, Sat 10:00–14:00) — early arrival or staying late never compensates for a short day; extra time goes in the overtime log.</p>`:'<p style="font-size:13px;color:var(--ink3)">No staff accounts yet.</p>';
   const recs=[...(DB.attendance||[])].filter(a=>String(a.date).slice(0,7)===month).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
   document.getElementById('attn-records').innerHTML=recs.length?`
     <table class="stbl"><thead><tr><th>Date</th><th>Staff</th><th>In</th><th>Out</th><th>Worked</th><th>Overtime</th></tr></thead><tbody>
@@ -3209,7 +3212,7 @@ function renderExecDash(){
       <td>${r.lateCount?`<span class="tag t-late">${r.lateCount}×</span>`:'<span style="color:var(--ink3)">—</span>'}</td>
       <td>${r.earlyCount?`<span class="tag t-late">${r.earlyCount}×</span>`:'<span style="color:var(--ink3)">—</span>'}</td></tr>`).join('')}
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Late = check-in after 10:00. Early = check-out before 19:00 (Sat 16:30). Compliance = submitted entry slots ÷ expected (2 per working day, Sundays off).</p>`;
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Late = check-in after 10:00. Early = check-out before 19:00 (Sat 14:00). Compliance = submitted entry slots ÷ expected (2 per working day, Sundays off).</p>`;
 }
 function renderExecEntries(){
   const nf=document.getElementById('ef-name').value.toLowerCase();
@@ -3269,7 +3272,7 @@ function renderExecStaff(){
       <td>${s.lateArr?`<span class="tag t-late">${s.lateArr}×</span>`:'—'}</td>
       <td>${s.earlyLeft?`<span class="tag t-late">${s.earlyLeft}×</span>`:'—'}</td></tr>`).join('')}
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Office hours count only time inside 10:00–19:00 (Sat 10:00–16:30) on days with a check-in/out in this period.</p>`:emptyState('📭','No data.');
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Office hours count only time inside 10:00–19:00 (Sat 10:00–14:00) on days with a check-in/out in this period.</p>`:emptyState('📭','No data.');
 }
 
 function exportCSV(){
