@@ -35,10 +35,20 @@ const SHEETS = {
   announcements: ['id', 'title', 'body', 'postedById', 'postedByName', 'postedAt', 'showFrom', 'showUntil'],
   // v10 — executive management score for the leaderboard
   mgmtScores:  ['id', 'month', 'staffId', 'staffName', 'score', 'note', 'setBy', 'setAt'],
+  // v24 — sales pipeline for the sales staff (one row per lead). foundBy is
+  // 'self' when the salesperson sourced the lead, 'team' when it came from a
+  // team enquiry; it decides the lead share of the commission. maxStage is the
+  // furthest stage ever reached, so a lead that is later lost still counts in
+  // the funnel for the stages it got through.
+  salesLeads:  ['id', 'staffId', 'staffName', 'createdAt', 'company', 'contact', 'phone', 'email', 'source', 'foundBy',
+                'service', 'value', 'stage', 'maxStage', 'stageAt', 'nextAction', 'nextDate', 'lostReason',
+                'wonAt', 'paidAmount', 'paidAt', 'notes', 'updatedAt'],
+  // v24 — one row per salesperson per day: the effort behind the pipeline.
+  salesActivity: ['id', 'staffId', 'staffName', 'date', 'calls', 'messages', 'meetings', 'proposals', 'note', 'submittedAt'],
   config:   ['key', 'value']
 };
 
-const CODE_VERSION = 'v23-schema-cache-holidays';
+const CODE_VERSION = 'v24-sales-pipeline';
 
 const DEFAULT_CLIENTS = ['Baaqat Flowers','Flovia Flowers','8th Cafe','Florens Flowers','Flat Chocolate','Al Rasa','Fedora Perfumes','Elite Party','Hair Salon'];
 const DEFAULT_EXEC_CODE = '99999';
@@ -137,6 +147,10 @@ function handleRequest(e) {
       case 'deleteAnnouncement': result = deleteRow(ss, 'announcements', params.id); break;
       case 'setMgmtScore':       result = setMgmtScore(ss, params); break;
       case 'getLeaderboard':     result = getLeaderboard(ss, params.month); break;
+      // ---- v24: sales pipeline ----
+      case 'saveSalesLead':      result = upsertRow(ss, 'salesLeads', JSON.parse(params.data)); break;
+      case 'deleteSalesLead':    result = deleteRow(ss, 'salesLeads', params.id); break;
+      case 'saveSalesActivity':  result = saveSalesActivity(ss, JSON.parse(params.data)); break;
       default: result = { error: 'Unknown action' };
     }
     return jsonResponse(result);
@@ -301,8 +315,18 @@ function getAll(ss) {
   }));
   // ---- v10: announcements ----
   const announcements = getAnnouncements(ss);
+  // ---- v24: sales pipeline ----
+  const salesLeads = sheetToObjects(ss.getSheetByName('salesLeads')).map(l => ({
+    ...l,
+    createdAt: dateCellToString(l.createdAt, tz), stageAt: dateCellToString(l.stageAt, tz),
+    nextDate: dateCellToString(l.nextDate, tz), wonAt: dateCellToString(l.wonAt, tz),
+    paidAt: dateCellToString(l.paidAt, tz)
+  }));
+  const salesActivity = sheetToObjects(ss.getSheetByName('salesActivity')).map(a => ({
+    ...a, date: dateCellToString(a.date, tz)
+  }));
   return { staff, managers, clients, clientServices, entries, codes, reports, tasks, leads, attendance,
-           incMembers, deliverables, incWork, incReports, announcements,
+           incMembers, deliverables, incWork, incReports, announcements, salesLeads, salesActivity,
            config: configMap, codeVersion: CODE_VERSION, execCode: String(execCode) };
 }
 
@@ -344,7 +368,8 @@ function attnUpsert(ss, params) {
 
 // Columns that must stay literal text — Sheets would otherwise turn values
 // like "3-4" into a date, or strip leading zeros.
-const TEXT_COLS = { qty: 1, month: 1, date: 1, chequeNo: 1, joinedAt: 1, doneAt: 1, submittedAt: 1 };
+const TEXT_COLS = { qty: 1, month: 1, date: 1, chequeNo: 1, joinedAt: 1, doneAt: 1, submittedAt: 1,
+                    stageAt: 1, nextDate: 1, wonAt: 1, paidAt: 1, phone: 1, updatedAt: 1 };
 
 function addRow(ss, sheetName, obj) {
   const sh = ss.getSheetByName(sheetName);
@@ -359,6 +384,45 @@ function addRow(ss, sheetName, obj) {
     cell.setValue(v);
   });
   return { ok: true };
+}
+
+// Insert-or-update by id: rewrites every column the object carries and leaves
+// the rest alone. Used by the sales pipeline, where a lead is edited many
+// times (stage, next step, payment) and each save sends the whole lead.
+function upsertRow(ss, sheetName, obj) {
+  if (!obj || !obj.id) return { ok: false, error: 'Missing id' };
+  const sh = ss.getSheetByName(sheetName);
+  const headers = sheetHeaders(sh, sheetName);
+  const data = sh.getDataRange().getValues();
+  let r = -1;
+  for (let i = 1; i < data.length; i++) if (String(data[i][0]) === String(obj.id)) { r = i + 1; break; }
+  if (r < 0) return addRow(ss, sheetName, obj);
+  headers.forEach((h, i) => {
+    if (!(h in obj)) return;
+    let v = obj[h];
+    if (v === undefined || v === null) v = '';
+    const cell = sh.getRange(r, i + 1);
+    if (TEXT_COLS[h]) cell.setNumberFormat('@');
+    cell.setValue(v);
+  });
+  return { ok: true };
+}
+
+// One activity row per salesperson per day: saving the same day again
+// replaces that day's numbers instead of adding a second row.
+function saveSalesActivity(ss, obj) {
+  const sh = ss.getSheetByName('salesActivity');
+  const headers = sheetHeaders(sh, 'salesActivity');
+  const tz = ss.getSpreadsheetTimeZone();
+  const data = sh.getDataRange().getValues();
+  const iStaff = headers.indexOf('staffId'), iDate = headers.indexOf('date'), iId = headers.indexOf('id');
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][iStaff]) === String(obj.staffId) && dateCellToString(data[i][iDate], tz) === String(obj.date)) {
+      obj.id = String(data[i][iId]);
+      return upsertRow(ss, 'salesActivity', obj);
+    }
+  }
+  return addRow(ss, 'salesActivity', obj);
 }
 
 function deleteRow(ss, sheetName, id) {

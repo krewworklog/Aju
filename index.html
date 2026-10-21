@@ -351,6 +351,11 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('my-attendance',this)"><span class="nav-ic">🕘</span>My Attendance<span class="nbadge amber" id="b-myattn"></span></div>
         <div class="nav" onclick="gp('my-increment',this)"><span class="nav-ic">📈</span>Increment<span class="nbadge purple" id="b-myinc"></span></div>
         <div class="nav" onclick="gp('my-salary',this)"><span class="nav-ic">💰</span>My Salary</div>
+        <div id="sb-sales-staff" style="display:none">
+          <div class="sbl">Sales</div>
+          <div class="nav" onclick="gp('my-pipeline',this)"><span class="nav-ic">🧲</span>My Pipeline<span class="nbadge red" id="b-mypipe" style="display:none">0</span></div>
+          <div class="nav" onclick="gp('my-activity',this)"><span class="nav-ic">📞</span>Daily Activity<span class="nbadge amber" id="b-myact" style="display:none">!</span></div>
+        </div>
         <div class="sbl">Team</div>
         <div class="nav" onclick="gp('announcements',this)"><span class="nav-ic">📢</span>Announcements<span class="nbadge amber b-ann"></span></div>
         <div class="nav" onclick="gp('leaderboard',this)"><span class="nav-ic">🏆</span>Leaderboard</div>
@@ -385,6 +390,7 @@ textarea{resize:vertical;line-height:1.6;}
         <div class="nav" onclick="gp('exec-adjust',this)"><span class="nav-ic">⚖️</span>Adjustments<span class="nbadge amber" id="b-exec-adjust" style="display:none">0</span></div>
         <div class="nav" onclick="gp('exec-increment',this)"><span class="nav-ic">📈</span>Increment Program</div>
         <div class="nav" onclick="gp('exec-attendance',this)"><span class="nav-ic">🕘</span>Attendance</div>
+        <div class="nav" onclick="gp('exec-sales',this)"><span class="nav-ic">🧲</span>Sales Performance<span class="nbadge red" id="b-exec-sales" style="display:none">0</span></div>
         <div class="sbl">Team</div>
         <div class="nav" onclick="gp('announcements',this)"><span class="nav-ic">📢</span>Announcements<span class="nbadge amber b-ann"></span></div>
         <div class="nav" onclick="gp('leaderboard',this)"><span class="nav-ic">🏆</span>Leaderboard</div>
@@ -455,6 +461,24 @@ textarea{resize:vertical;line-height:1.6;}
       <div class="page" id="page-my-targets">
         <div class="ph"><div><div class="pt">My Lead Targets</div><p class="ps">Log each organic enquiry you receive. Every one you add counts toward your monthly goal.</p></div></div>
         <div id="my-targets-wrap"></div>
+      </div>
+
+      <!-- STAFF (SALES): PIPELINE -->
+      <div class="page" id="page-my-pipeline">
+        <div class="ph"><div><div class="pt">My Pipeline</div><p class="ps">Every lead you work on, from first contact to signed client. Keep the next step and date up to date.</p></div></div>
+        <div id="my-pipeline-wrap"></div>
+      </div>
+
+      <!-- STAFF (SALES): DAILY ACTIVITY -->
+      <div class="page" id="page-my-activity">
+        <div class="ph"><div><div class="pt">Daily Activity</div><p class="ps">Log today's calls, follow-ups, meetings and proposals before you leave.</p></div></div>
+        <div id="my-activity-wrap"></div>
+      </div>
+
+      <!-- EXECUTIVE: SALES PERFORMANCE -->
+      <div class="page" id="page-exec-sales">
+        <div class="ph"><div><div class="pt">Sales Performance</div><p class="ps">Effort, pipeline, conversion and commission for the sales team.</p></div><input type="month" id="es-month" style="width:auto" onchange="renderExecSales()"/></div>
+        <div id="exec-sales-wrap"></div>
       </div>
 
       <!-- MANAGER: OVERVIEW -->
@@ -905,7 +929,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v43';
+const APP_VERSION='v44';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1156,6 +1180,10 @@ function normalizeDB(db){
   (db.codes||[]).forEach(c=>{c.generatedDate=normDate(c.generatedDate);});
   (db.leads||[]).forEach(l=>{l.createdAt=normDate(l.createdAt);l.salesAt=normDateTime(l.salesAt);});
   (db.attendance||[]).forEach(a=>{a.date=normDate(a.date);a.checkIn=normTimeOnly(a.checkIn);a.checkOut=normTimeOnly(a.checkOut);});
+  // v24 sales tabs: absent until the new backend is deployed, so default them.
+  db.salesLeads=db.salesLeads||[];db.salesActivity=db.salesActivity||[];
+  db.salesLeads.forEach(l=>{['createdAt','stageAt','nextDate','wonAt','paidAt'].forEach(k=>{l[k]=l[k]?normDate(l[k]):'';});});
+  db.salesActivity.forEach(a=>{a.date=normDate(a.date);});
 }
 
 // ════════════════════════════════════════
@@ -1509,6 +1537,7 @@ function launchApp(){
   const rc=document.getElementById('role-chip');rc.className='role-chip chip-'+role;rc.textContent=role.charAt(0).toUpperCase()+role.slice(1);
   ['sb-staff','sb-manager','sb-exec','sb-hr'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('sb-'+role).style.display='block';
+  document.getElementById('sb-sales-staff').style.display=role==='staff'&&isSalesStaff(name)?'block':'none';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
   if(role==='staff'){initLogForm();document.getElementById('page-log').classList.add('active');document.querySelector('#sb-staff .nav').classList.add('active');}
@@ -1538,6 +1567,9 @@ function gp(id,el){
     'mgr-increment':()=>renderIncProgram('mgr'),
     'exec-increment':()=>renderIncProgram('exec'),
     'my-targets':renderMyTargets,
+    'my-pipeline':renderMyPipeline,
+    'my-activity':renderMyActivity,
+    'exec-sales':renderExecSales,
     'my-attendance':renderMyAttendance,
     'mgr-staff':renderStaffTable,
     'mgr-clients':()=>renderClientsOnboarding('mgr-clients-onboard'),
@@ -3336,6 +3368,14 @@ function updateBadges(){
     const m=todayStr().slice(0,7);
     bTg.textContent=targetsFor(session.user.name).filter(t=>leadsForTarget(t.id,m).length<t.goal).length;
   }
+  // Sales: overdue / due follow-ups, and today's activity not logged yet.
+  const pipeDue=l=>salesOverdue(l)||salesDueToday(l);
+  const bPipe=document.getElementById('b-mypipe');
+  if(bPipe&&session.user&&session.role==='staff'){const n=salesLeadsFor(session.user.id).filter(pipeDue).length;bPipe.textContent=n;bPipe.style.display=n?'':'none';}
+  const bAct=document.getElementById('b-myact');
+  if(bAct&&session.user&&session.role==='staff'){const done=salesActivityFor(session.user.id).some(a=>a.date===todayStr());bAct.style.display=done?'none':'';}
+  const bES=document.getElementById('b-exec-sales');
+  if(bES){const n=salesLeadsFor(null).filter(salesOverdue).length;bES.textContent=n;bES.style.display=n?'':'none';}
   const bgMT=document.getElementById('b-mgr-tasks');if(bgMT)bgMT.textContent=myAssigned;
   const beMT=document.getElementById('b-exec-tasks');if(beMT)beMT.textContent=myAssigned;
   // Increment badge: enrolled and not yet qualified this month.
@@ -3824,6 +3864,335 @@ async function saveMgmtScore(staffId){
     if(err){err.textContent='Could not save: '+e.message;err.style.display='block';}
     toast('Could not save the score.','err');
   }
+}
+
+// ════════════════════════════════════════
+//  SALES PIPELINE (v24)
+// ════════════════════════════════════════
+// Sales staff log every lead here and move it through fixed stages, and log
+// their daily effort on the activity page. The executive sees it all on the
+// Sales Performance page. Matched by first name, like LEAD_TARGETS.
+const SALES_STAFF=['Kaashish','Kashish'];
+const SALES_START='2026-10-19';            // Kaashish's first day
+// Commission, % of the client's FIRST monthly payment once it is collected:
+// the lead share if the salesperson found the lead, the close share always.
+const SALES_COMMISSION={found:5,close:5};
+const SALES_DEFAULT_VALUE=6000;            // typical Krew retainer, AED/month
+const SALES_STAGES=['New','Contacted','Meeting','Proposal','Negotiation','Won','Lost'];
+const SALES_OPEN=['New','Contacted','Meeting','Proposal','Negotiation'];
+const SALES_SOURCES=['Instagram','Facebook','LinkedIn','Google / Website','Referral','Cold call','WhatsApp','Walk-in / Event','Team enquiry','Other'];
+const SALES_LOST=['Price too high','Chose another agency','No budget right now','No response','Not a fit','Other'];
+const SALES_STAGE_TAG={New:'t-used',Contacted:'t-cl',Meeting:'t-cl',Proposal:'t-pu',Negotiation:'t-late',Won:'t-ok',Lost:'t-pend'};
+
+function isSalesStaff(name){
+  const f=String(name||'').trim().toLowerCase().split(/\s+/)[0];
+  return SALES_STAFF.some(n=>n.toLowerCase()===f);
+}
+function salesStageIdx(s){const i=SALES_STAGES.indexOf(s);return i<0?0:i;}
+// Furthest real stage reached (Lost is an outcome, not a step forward).
+function salesReached(l,stage){
+  const m=Math.max(salesStageIdx(l.maxStage||'New'),l.stage==='Lost'?0:salesStageIdx(l.stage));
+  return m>=salesStageIdx(stage);
+}
+function salesNum(v){const n=parseFloat(v);return isFinite(n)?n:0;}
+function aed(n){return Math.round(salesNum(n)).toLocaleString()+' AED';}
+function salesPct(a,b){return b?Math.round(a/b*100)+'%':'—';}
+function salesLeadsFor(staffId){
+  return (DB.salesLeads||[]).filter(l=>staffId==null||String(l.staffId)===String(staffId));
+}
+function salesActivityFor(staffId){
+  return (DB.salesActivity||[]).filter(a=>staffId==null||String(a.staffId)===String(staffId));
+}
+function salesCommission(l){
+  if(l.stage!=='Won'||!salesNum(l.paidAmount))return {lead:0,close:0,total:0};
+  const p=salesNum(l.paidAmount);
+  const lead=l.foundBy==='self'?p*SALES_COMMISSION.found/100:0, close=p*SALES_COMMISSION.close/100;
+  return {lead,close,total:lead+close};
+}
+function salesOverdue(l){return SALES_OPEN.includes(l.stage)&&l.nextDate&&l.nextDate<todayStr();}
+function salesDueToday(l){return SALES_OPEN.includes(l.stage)&&l.nextDate===todayStr();}
+// Mon–Sat working days from a to b inclusive (Krew closes on Sundays).
+function salesWorkDays(a,b){
+  let n=0;const d=new Date(a+'T12:00:00Z'),e=new Date(b+'T12:00:00Z');
+  for(;d<=e;d.setUTCDate(d.getUTCDate()+1))if(d.getUTCDay()!==0)n++;
+  return n;
+}
+function salesMonthEnd(m){const[y,mo]=m.split('-').map(Number);return `${m}-${pad(new Date(Date.UTC(y,mo,0)).getUTCDate())}`;}
+function salesWeekStart(ds){const d=new Date(ds+'T12:00:00Z');const k=(d.getUTCDay()+6)%7;d.setUTCDate(d.getUTCDate()-k);return d.toISOString().slice(0,10);}
+function salesDaysBetween(a,b){return Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/86400000);}
+
+// ---- Lead form (shared by the salesperson and the executive) ----
+function openSalesLead(id){
+  const l=id?(DB.salesLeads||[]).find(x=>String(x.id)===String(id)):null;
+  const v=l||{stage:'New',foundBy:'self',value:SALES_DEFAULT_VALUE,source:'Instagram'};
+  const opt=(arr,cur)=>arr.map(o=>`<option ${o===cur?'selected':''}>${escapeHtml(o)}</option>`).join('');
+  const ov=document.createElement('div');
+  ov.id='sales-modal';ov.className='modal-ov show';
+  ov.innerHTML=`<div class="modal" style="width:560px">
+    <div class="modal-t">${l?'Edit lead':'Add a lead'}</div>
+    <p class="modal-s">Every open lead needs a next step and a date, so nothing is forgotten.</p>
+    <div class="fg">
+      <div class="f full"><label>Company / client name *</label><input id="sl-company" value="${escapeHtml(v.company||'')}" placeholder="e.g. Sensasia Spa"></div>
+      <div class="f"><label>Contact person</label><input id="sl-contact" value="${escapeHtml(v.contact||'')}" placeholder="Name"></div>
+      <div class="f"><label>Phone / WhatsApp</label><input id="sl-phone" value="${escapeHtml(v.phone||'')}" placeholder="+971…"></div>
+      <div class="f"><label>Email</label><input id="sl-email" value="${escapeHtml(v.email||'')}" placeholder="name@company.com"></div>
+      <div class="f"><label>Service</label><input id="sl-service" value="${escapeHtml(v.service||'')}" placeholder="e.g. Social media + ads"></div>
+      <div class="f"><label>Source</label><select id="sl-source">${opt(SALES_SOURCES,v.source)}</select></div>
+      <div class="f"><label>Who found this lead?</label><select id="sl-found">
+        <option value="self" ${v.foundBy!=='team'?'selected':''}>I found it myself</option>
+        <option value="team" ${v.foundBy==='team'?'selected':''}>The team passed it to me</option></select></div>
+      <div class="f"><label>Monthly value (AED)</label><input id="sl-value" type="number" min="0" step="100" value="${escapeHtml(v.value||'')}"></div>
+      <div class="f"><label>Stage</label><select id="sl-stage" onchange="salesModalStage()">${opt(SALES_STAGES,v.stage)}</select></div>
+      <div class="f" id="sl-next-wrap"><label>Next step *</label><input id="sl-next" value="${escapeHtml(v.nextAction||'')}" placeholder="e.g. Call to book a meeting"></div>
+      <div class="f" id="sl-nextdate-wrap"><label>Next step date *</label><input id="sl-nextdate" type="date" value="${escapeHtml(v.nextDate||'')}"></div>
+      <div class="f full" id="sl-lost-wrap"><label>Why was it lost? *</label><select id="sl-lost"><option value="">Choose…</option>${opt(SALES_LOST,v.lostReason)}</select></div>
+      <div class="f" id="sl-paid-wrap"><label>First payment received (AED)</label><input id="sl-paid" type="number" min="0" step="100" value="${escapeHtml(v.paidAmount||'')}" placeholder="Leave blank until paid"></div>
+      <div class="f" id="sl-paidat-wrap"><label>Payment date</label><input id="sl-paidat" type="date" value="${escapeHtml(v.paidAt||'')}"></div>
+      <div class="f full"><label>Notes</label><textarea id="sl-notes" rows="3" placeholder="What they need, budget, objections…">${escapeHtml(v.notes||'')}</textarea></div>
+    </div>
+    <div class="ferr" id="sl-err"></div>
+    <div class="modal-ft">
+      ${l&&(session.role==='exec'||String(l.staffId)===String(session.user.id))?`<button class="btn btn-danger" style="margin-right:auto" onclick="deleteSalesLead('${l.id}')">Delete</button>`:''}
+      <button class="btn btn-ghost" onclick="document.getElementById('sales-modal').remove()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSalesLead(${l?`'${l.id}'`:'null'})">💾 Save lead</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  salesModalStage();
+}
+// Show only the fields that apply to the chosen stage.
+function salesModalStage(){
+  const s=document.getElementById('sl-stage').value;
+  const show=(id,on)=>{document.getElementById(id).style.display=on?'':'none';};
+  const open=SALES_OPEN.includes(s);
+  show('sl-next-wrap',open);show('sl-nextdate-wrap',open);
+  show('sl-lost-wrap',s==='Lost');
+  show('sl-paid-wrap',s==='Won');show('sl-paidat-wrap',s==='Won');
+}
+async function saveSalesLead(id){
+  const g=k=>document.getElementById(k).value.trim();
+  const err=m=>{const e=document.getElementById('sl-err');e.textContent=m;e.style.display='block';};
+  const old=id?(DB.salesLeads||[]).find(x=>String(x.id)===String(id)):null;
+  const stage=g('sl-stage'), today=todayStr();
+  if(!g('sl-company'))return err('Enter the company or client name.');
+  if(SALES_OPEN.includes(stage)&&(!g('sl-next')||!g('sl-nextdate')))return err('Add the next step and its date. Every open lead needs one.');
+  if(stage==='Lost'&&!g('sl-lost'))return err('Choose why the lead was lost.');
+  if(stage==='Won'&&g('sl-paid')&&!g('sl-paidat'))return err('Add the date the first payment was received.');
+  // A lead belongs to a salesperson. When the executive adds one, it goes to
+  // the (first) sales staff member, so it still counts on their numbers.
+  const rep=session.role==='staff'?session.user:((DB.staff||[]).find(s=>isSalesStaff(s.name))||session.user);
+  const owner=old?{staffId:old.staffId,staffName:old.staffName}:{staffId:rep.id,staffName:rep.name};
+  // The furthest stage reached only ever moves forward.
+  const prevMax=old?Math.max(salesStageIdx(old.maxStage||'New'),old.stage==='Lost'?0:salesStageIdx(old.stage)):0;
+  const maxStage=SALES_STAGES[Math.max(prevMax,stage==='Lost'?0:salesStageIdx(stage))];
+  const obj={
+    id:id||('sl'+Date.now()), ...owner,
+    createdAt:old?old.createdAt:today,
+    company:g('sl-company'),contact:g('sl-contact'),phone:g('sl-phone'),email:g('sl-email'),
+    source:g('sl-source'),foundBy:g('sl-found'),service:g('sl-service'),value:g('sl-value'),
+    stage,maxStage,stageAt:!old||old.stage!==stage?today:(old.stageAt||today),
+    nextAction:SALES_OPEN.includes(stage)?g('sl-next'):'',nextDate:SALES_OPEN.includes(stage)?g('sl-nextdate'):'',
+    lostReason:stage==='Lost'?g('sl-lost'):'',
+    wonAt:stage==='Won'?((old&&old.wonAt)||today):'',
+    paidAmount:stage==='Won'?g('sl-paid'):'',paidAt:stage==='Won'?g('sl-paidat'):'',
+    notes:g('sl-notes'),updatedAt:today+' '+nowTime()
+  };
+  try{
+    await api('saveSalesLead',{data:obj});
+    document.getElementById('sales-modal').remove();
+    await syncAll();toast('Lead saved ✅','ok');
+  }catch(e){err('Could not save: '+e.message);}
+}
+async function deleteSalesLead(id){
+  if(!confirm('Delete this lead? Its history is lost for good.'))return;
+  try{await api('deleteSalesLead',{id});const m=document.getElementById('sales-modal');if(m)m.remove();await syncAll();toast('Lead deleted.');}
+  catch(e){toast('Could not delete: '+e.message,'err');}
+}
+
+function salesLeadRow(l){
+  const od=salesOverdue(l), dt=salesDueToday(l);
+  const when=SALES_OPEN.includes(l.stage)
+    ?`<span style="color:${od?'var(--red)':dt?'var(--amber)':'var(--ink3)'}">${od?'⚠ overdue · ':dt?'⏰ today · ':''}${escapeHtml(l.nextAction||'')}${l.nextDate?' — '+l.nextDate:''}</span>`
+    :l.stage==='Won'?`<span style="color:var(--green)">Won ${l.wonAt||''}${salesNum(l.paidAmount)?' · paid '+aed(l.paidAmount):' · <span style="color:var(--amber)">waiting for first payment</span>'}</span>`
+    :`<span style="color:var(--ink3)">Lost: ${escapeHtml(l.lostReason||'—')}</span>`;
+  return `<div class="ec" style="display:flex;justify-content:space-between;gap:12px;align-items:center;cursor:pointer" onclick="openSalesLead('${l.id}')">
+    <div style="min-width:0">
+      <div style="font-weight:700">${escapeHtml(l.company)} <span class="tag ${SALES_STAGE_TAG[l.stage]||'t-used'}">${escapeHtml(l.stage)}</span></div>
+      <div style="font-size:12px;color:var(--ink3);margin-top:3px">${escapeHtml(l.source||'')}${l.foundBy==='team'?' · from team':''}${l.service?' · '+escapeHtml(l.service):''}${session.role==='exec'?' · '+escapeHtml(l.staffName||''):''}</div>
+      <div style="font-size:12px;margin-top:4px">${when}</div>
+    </div>
+    <div style="text-align:right;flex-shrink:0"><div style="font-weight:800">${aed(l.value)}</div><div style="font-size:11px;color:var(--ink3)">per month</div></div>
+  </div>`;
+}
+
+// ---- Salesperson: My Pipeline ----
+function renderMyPipeline(){
+  const el=document.getElementById('my-pipeline-wrap');if(!el)return;
+  const mine=salesLeadsFor(session.user.id), m=todayStr().slice(0,7);
+  const open=mine.filter(l=>SALES_OPEN.includes(l.stage));
+  const due=open.filter(l=>salesOverdue(l)||salesDueToday(l));
+  const wonM=mine.filter(l=>l.stage==='Won'&&String(l.wonAt).slice(0,7)===m);
+  const commM=mine.filter(l=>String(l.paidAt).slice(0,7)===m).reduce((s,l)=>s+salesCommission(l).total,0);
+  const order=l=>(salesOverdue(l)?0:salesDueToday(l)?1:2)+'|'+(l.nextDate||'9999');
+  const recentClosed=mine.filter(l=>!SALES_OPEN.includes(l.stage)).sort((a,b)=>String(b.stageAt).localeCompare(String(a.stageAt))).slice(0,15);
+  el.innerHTML=`
+    <div class="sg">
+      <div class="sc"><div class="sl">Open leads</div><div class="sv sv-ac">${open.length}</div><div class="ss">${aed(open.reduce((s,l)=>s+salesNum(l.value),0))} / month in play</div></div>
+      <div class="sc"><div class="sl">Follow-ups due</div><div class="sv ${due.length?'sv-re':'sv-gr'}">${due.length}</div><div class="ss">today or overdue</div></div>
+      <div class="sc"><div class="sl">Won this month</div><div class="sv sv-gr">${wonM.length}</div><div class="ss">${aed(wonM.reduce((s,l)=>s+salesNum(l.value),0))} / month</div></div>
+      <div class="sc"><div class="sl">My commission this month</div><div class="sv sv-pu">${aed(commM)}</div><div class="ss">on first payments collected</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+      <div class="ct" style="margin:0">Open leads — follow-ups first</div>
+      <button class="btn btn-primary btn-sm" onclick="openSalesLead()">＋ Add lead</button>
+    </div>
+    ${open.length?[...open].sort((a,b)=>order(a).localeCompare(order(b))).map(salesLeadRow).join(''):emptyState('🧲','No open leads yet. Tap “Add lead” for every business you contact.')}
+    ${recentClosed.length?`<div class="ct" style="margin-top:1.5rem">Recently won or lost</div>${recentClosed.map(salesLeadRow).join('')}`:''}
+    <p style="font-size:12px;color:var(--ink3);margin-top:1rem">Commission: ${SALES_COMMISSION.found}% of the first month's payment if you found the lead, plus ${SALES_COMMISSION.close}% for closing it. It counts once the payment is recorded on the lead.</p>`;
+}
+
+// ---- Salesperson: Daily Activity ----
+function renderMyActivity(){
+  const el=document.getElementById('my-activity-wrap');if(!el)return;
+  const mine=salesActivityFor(session.user.id).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+  const t=todayStr(), row=mine.find(a=>a.date===t)||{};
+  const wk=salesWeekStart(t);
+  const sum=(arr,k)=>arr.reduce((s,a)=>s+salesNum(a[k]),0);
+  const thisWeek=mine.filter(a=>a.date>=wk&&a.date<=t);
+  const leadsWk=salesLeadsFor(session.user.id).filter(l=>l.createdAt>=wk&&l.createdAt<=t).length;
+  el.innerHTML=`
+    <div class="card">
+      <div class="ct">Today's activity</div>
+      <div class="fg">
+        <div class="f"><label>Date</label><input type="date" id="sa-date" value="${t}" max="${t}" onchange="salesActivityDate()"></div>
+        <div class="f"><label>Calls made</label><input type="number" id="sa-calls" min="0" step="1" value="${escapeHtml(row.calls||'')}" placeholder="0"></div>
+        <div class="f"><label>WhatsApp / email / DM follow-ups</label><input type="number" id="sa-messages" min="0" step="1" value="${escapeHtml(row.messages||'')}" placeholder="0"></div>
+        <div class="f"><label>Meetings held</label><input type="number" id="sa-meetings" min="0" step="1" value="${escapeHtml(row.meetings||'')}" placeholder="0"></div>
+        <div class="f"><label>Proposals sent</label><input type="number" id="sa-proposals" min="0" step="1" value="${escapeHtml(row.proposals||'')}" placeholder="0"></div>
+        <div class="f full"><label>Note (optional)</label><input id="sa-note" value="${escapeHtml(row.note||'')}" placeholder="Anything worth knowing about today"></div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:14px" onclick="saveSalesActivity()">${row.id?'💾 Update':'✔ Save'} activity</button>
+      <span style="font-size:12px;color:var(--ink3);margin-left:10px">Takes 2 minutes. Fill it in before you leave each day.</span>
+    </div>
+    <div class="sg">
+      <div class="sc"><div class="sl">Calls this week</div><div class="sv sv-ac">${sum(thisWeek,'calls')}</div></div>
+      <div class="sc"><div class="sl">Follow-ups this week</div><div class="sv sv-te">${sum(thisWeek,'messages')}</div></div>
+      <div class="sc"><div class="sl">Meetings this week</div><div class="sv sv-pu">${sum(thisWeek,'meetings')}</div></div>
+      <div class="sc"><div class="sl">Proposals this week</div><div class="sv sv-am">${sum(thisWeek,'proposals')}</div></div>
+      <div class="sc"><div class="sl">New leads this week</div><div class="sv sv-gr">${leadsWk}</div><div class="ss">from My Pipeline</div></div>
+    </div>
+    <div class="card"><div class="ct">Last 14 days</div>
+      ${mine.length?`<table class="stbl"><thead><tr><th>Date</th><th>Calls</th><th>Follow-ups</th><th>Meetings</th><th>Proposals</th><th>Note</th></tr></thead><tbody>
+      ${mine.slice(0,14).map(a=>`<tr><td>${a.date}</td><td>${salesNum(a.calls)}</td><td>${salesNum(a.messages)}</td><td>${salesNum(a.meetings)}</td><td>${salesNum(a.proposals)}</td><td style="font-size:12px;color:var(--ink3)">${escapeHtml(a.note||'')}</td></tr>`).join('')}
+      </tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">Nothing logged yet.</p>'}
+    </div>`;
+}
+// Picking an earlier date loads what was saved for it.
+function salesActivityDate(){
+  const d=document.getElementById('sa-date').value;
+  const r=salesActivityFor(session.user.id).find(a=>a.date===d)||{};
+  ['calls','messages','meetings','proposals','note'].forEach(k=>{document.getElementById('sa-'+k).value=r[k]||'';});
+}
+async function saveSalesActivity(){
+  const g=k=>document.getElementById('sa-'+k).value.trim();
+  const date=g('date');
+  if(!date||date>todayStr()){toast('Choose today or an earlier date.','err');return;}
+  if(date<salesWeekStart(todayStr())&&!confirm('That date is before this week. Save it anyway?'))return;
+  const n=k=>String(Math.max(0,parseInt(g(k)||'0',10)||0));
+  const obj={id:'sa'+Date.now(),staffId:session.user.id,staffName:session.user.name,date,
+    calls:n('calls'),messages:n('messages'),meetings:n('meetings'),proposals:n('proposals'),note:g('note'),
+    submittedAt:todayStr()+' '+nowTime()};
+  try{await api('saveSalesActivity',{data:obj});await syncAll();toast('Activity saved ✅','ok');}
+  catch(e){toast('Could not save: '+e.message,'err');}
+}
+
+// ---- Executive: Sales Performance ----
+function renderExecSales(){
+  const el=document.getElementById('exec-sales-wrap');if(!el)return;
+  const mi=document.getElementById('es-month');
+  if(mi&&!mi.value)mi.value=todayStr().slice(0,7);
+  const m=(mi&&mi.value)||todayStr().slice(0,7), t=todayStr();
+  const from=[m+'-01',SALES_START].sort()[1], to=[salesMonthEnd(m),t].sort()[0];
+  const all=salesLeadsFor(null), acts=salesActivityFor(null);
+  const inM=d=>String(d||'').slice(0,7)===m;
+  const sum=(arr,k)=>arr.reduce((s,a)=>s+salesNum(a[k]),0);
+  // Effort
+  const actM=acts.filter(a=>inM(a.date));
+  const wd=from<=to?salesWorkDays(from,to):0;
+  const daysLogged=new Set(actM.filter(a=>a.date>=from&&a.date<=to&&new Date(a.date+'T12:00:00Z').getUTCDay()!==0).map(a=>a.date)).size;
+  const per=k=>wd?(sum(actM,k)/wd).toFixed(1):'—';
+  // Results
+  const newM=all.filter(l=>inM(l.createdAt));
+  const wonM=all.filter(l=>l.stage==='Won'&&inM(l.wonAt));
+  const lostM=all.filter(l=>l.stage==='Lost'&&inM(l.stageAt));
+  const paidM=all.filter(l=>l.stage==='Won'&&inM(l.paidAt)&&salesNum(l.paidAmount));
+  const comm=paidM.map(l=>({l,c:salesCommission(l)}));
+  const commTot=comm.reduce((s,x)=>s+x.c.total,0);
+  const open=all.filter(l=>SALES_OPEN.includes(l.stage));
+  const overdue=open.filter(salesOverdue);
+  // Conversion, on every lead since the start (a month is too few to read)
+  const funnel=['Contacted','Meeting','Proposal','Won'].map(s=>({s,n:all.filter(l=>salesReached(l,s)).length}));
+  const closedDays=all.filter(l=>l.stage==='Won'&&l.wonAt&&l.createdAt).map(l=>salesDaysBetween(l.createdAt,l.wonAt));
+  const avgDays=closedDays.length?Math.round(closedDays.reduce((a,b)=>a+b,0)/closedDays.length):null;
+  const avgClose=avgDays===null?'—':avgDays+(avgDays===1?' day':' days');
+  const bySource=SALES_SOURCES.map(s=>({s,n:newM.filter(l=>l.source===s).length,won:all.filter(l=>l.source===s&&l.stage==='Won').length,tot:all.filter(l=>l.source===s).length})).filter(x=>x.n||x.tot);
+  const byLost=SALES_LOST.map(r=>({r,n:all.filter(l=>l.stage==='Lost'&&l.lostReason===r).length})).filter(x=>x.n);
+  // Weekly trend since the start
+  const weeks=[];for(let w=salesWeekStart(SALES_START);w<=t;){weeks.push(w);const d=new Date(w+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+7);w=d.toISOString().slice(0,10);}
+  const wEnd=w=>{const d=new Date(w+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+6);return d.toISOString().slice(0,10);};
+  const inW=(d,w)=>d&&d>=w&&d<=wEnd(w);
+  el.innerHTML=`
+    <div class="card"><div class="ct">Effort — ${m}${from>to?'':` · ${wd} working day${wd===1?'':'s'} so far`}</div>
+      <div class="sg" style="margin-bottom:0">
+        <div class="sc"><div class="sl">Days logged</div><div class="sv ${daysLogged<wd?'sv-am':'sv-gr'}">${daysLogged}/${wd}</div><div class="ss">activity filled in (Mon–Sat)</div></div>
+        <div class="sc"><div class="sl">Calls</div><div class="sv sv-ac">${sum(actM,'calls')}</div><div class="ss">${per('calls')} per day</div></div>
+        <div class="sc"><div class="sl">Follow-ups</div><div class="sv sv-te">${sum(actM,'messages')}</div><div class="ss">${per('messages')} per day</div></div>
+        <div class="sc"><div class="sl">Meetings</div><div class="sv sv-pu">${sum(actM,'meetings')}</div><div class="ss">${per('meetings')} per day</div></div>
+        <div class="sc"><div class="sl">Proposals</div><div class="sv sv-am">${sum(actM,'proposals')}</div><div class="ss">${per('proposals')} per day</div></div>
+      </div></div>
+    <div class="card"><div class="ct">Results — ${m}</div>
+      <div class="sg" style="margin-bottom:0">
+        <div class="sc"><div class="sl">New leads</div><div class="sv sv-ac">${newM.length}</div><div class="ss">${newM.filter(l=>l.foundBy==='self').length} found by her</div></div>
+        <div class="sc"><div class="sl">Won</div><div class="sv sv-gr">${wonM.length}</div><div class="ss">${aed(wonM.reduce((s,l)=>s+salesNum(l.value),0))} / month new retainers</div></div>
+        <div class="sc"><div class="sl">Lost</div><div class="sv sv-re">${lostM.length}</div></div>
+        <div class="sc"><div class="sl">First payments collected</div><div class="sv sv-gr">${aed(sum(paidM,'paidAmount'))}</div><div class="ss">${paidM.length} client${paidM.length===1?'':'s'}</div></div>
+        <div class="sc"><div class="sl">Commission due</div><div class="sv sv-pu">${aed(commTot)}</div><div class="ss">${SALES_COMMISSION.found}% lead + ${SALES_COMMISSION.close}% close</div></div>
+      </div></div>
+    <div class="card"><div class="ct">Pipeline right now</div>
+      <div class="sg">
+        <div class="sc"><div class="sl">Open leads</div><div class="sv sv-ac">${open.length}</div><div class="ss">${aed(open.reduce((s,l)=>s+salesNum(l.value),0))} / month</div></div>
+        <div class="sc"><div class="sl">Overdue follow-ups</div><div class="sv ${overdue.length?'sv-re':'sv-gr'}">${overdue.length}</div><div class="ss">next step date has passed</div></div>
+        <div class="sc"><div class="sl">Average time to close</div><div class="sv">${avgClose}</div><div class="ss">lead added → won</div></div>
+      </div>
+      <table class="stbl"><thead><tr><th>Stage</th><th>Leads</th><th>Monthly value</th></tr></thead><tbody>
+        ${SALES_OPEN.map(s=>{const a=open.filter(l=>l.stage===s);return`<tr><td><span class="tag ${SALES_STAGE_TAG[s]}">${s}</span></td><td>${a.length}</td><td>${aed(a.reduce((x,l)=>x+salesNum(l.value),0))}</td></tr>`;}).join('')}
+      </tbody></table></div>
+    <div class="card"><div class="ct">Conversion — every lead since ${SALES_START}</div>
+      <table class="stbl"><thead><tr><th>Step</th><th>Leads reaching it</th><th>% of all leads</th><th>% of previous step</th></tr></thead><tbody>
+        <tr><td>Added</td><td>${all.length}</td><td>100%</td><td>—</td></tr>
+        ${funnel.map((f,i)=>`<tr><td>${f.s}</td><td>${f.n}</td><td>${salesPct(f.n,all.length)}</td><td>${salesPct(f.n,i?funnel[i-1].n:all.length)}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="fg" style="margin-top:1rem">
+        <div><div class="ct" style="margin-bottom:6px">By source</div>
+          ${bySource.length?`<table class="stbl"><thead><tr><th>Source</th><th>New in ${m}</th><th>Won (all time)</th></tr></thead><tbody>${bySource.map(x=>`<tr><td>${escapeHtml(x.s)}</td><td>${x.n}</td><td>${x.won}/${x.tot}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No leads yet.</p>'}</div>
+        <div><div class="ct" style="margin-bottom:6px">Why leads are lost</div>
+          ${byLost.length?`<table class="stbl"><tbody>${byLost.map(x=>`<tr><td>${escapeHtml(x.r)}</td><td>${x.n}</td></tr>`).join('')}</tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No lost leads yet.</p>'}</div>
+      </div></div>
+    <div class="card"><div class="ct">Week by week since ${SALES_START}</div>
+      <table class="stbl"><thead><tr><th>Week of</th><th>Days logged</th><th>Calls</th><th>Follow-ups</th><th>Meetings</th><th>Proposals</th><th>New leads</th><th>Won</th></tr></thead><tbody>
+        ${[...weeks].reverse().map(w=>{const a=acts.filter(x=>inW(x.date,w));return`<tr><td>${w}</td><td>${new Set(a.map(x=>x.date)).size}</td><td>${sum(a,'calls')}</td><td>${sum(a,'messages')}</td><td>${sum(a,'meetings')}</td><td>${sum(a,'proposals')}</td><td>${all.filter(l=>inW(l.createdAt,w)).length}</td><td>${all.filter(l=>l.stage==='Won'&&inW(l.wonAt,w)).length}</td></tr>`;}).join('')}
+      </tbody></table></div>
+    <div class="card"><div class="ct">Commission — ${m}</div>
+      ${comm.length?`<table class="stbl"><thead><tr><th>Client</th><th>Salesperson</th><th>First payment</th><th>Lead ${SALES_COMMISSION.found}%</th><th>Close ${SALES_COMMISSION.close}%</th><th>Total</th></tr></thead><tbody>
+        ${comm.map(x=>`<tr><td>${escapeHtml(x.l.company)}</td><td>${escapeHtml(x.l.staffName||'')}</td><td>${aed(x.l.paidAmount)} <span style="color:var(--ink3);font-size:11px">${x.l.paidAt}</span></td><td>${x.c.lead?aed(x.c.lead):'— (team lead)'}</td><td>${aed(x.c.close)}</td><td style="font-weight:800">${aed(x.c.total)}</td></tr>`).join('')}
+        <tr><td colspan="5" style="font-weight:800">Total</td><td style="font-weight:800">${aed(commTot)}</td></tr>
+      </tbody></table>`:'<p style="font-size:13px;color:var(--ink3)">No first payments collected this month yet.</p>'}
+      ${wonM.filter(l=>!salesNum(l.paidAmount)).length?`<p style="font-size:12px;color:var(--amber);margin-top:8px">${wonM.filter(l=>!salesNum(l.paidAmount)).length} won deal(s) are waiting for their first payment — no commission until it is recorded.</p>`:''}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:1.5rem 0 12px;gap:10px;flex-wrap:wrap">
+      <div class="ct" style="margin:0">All leads${overdue.length?` · <span style="color:var(--red)">${overdue.length} overdue</span>`:''}</div>
+      <button class="btn btn-ghost btn-sm" onclick="openSalesLead()">＋ Add lead</button>
+    </div>
+    ${all.length?[...all].sort((a,b)=>(SALES_OPEN.includes(b.stage)-SALES_OPEN.includes(a.stage))||String(a.nextDate||'9').localeCompare(String(b.nextDate||'9'))).map(salesLeadRow).join(''):emptyState('🧲','No leads logged yet.')}`;
 }
 
 function emptyState(icon,msg){return`<div style="text-align:center;padding:4rem 2rem;color:var(--ink3)"><div style="font-size:36px;margin-bottom:12px">${icon}</div><p style="font-size:14px">${msg}</p></div>`;}
