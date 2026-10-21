@@ -44,11 +44,11 @@ const SHEETS = {
                 'service', 'value', 'stage', 'maxStage', 'stageAt', 'nextAction', 'nextDate', 'lostReason',
                 'wonAt', 'paidAmount', 'paidAt', 'notes', 'updatedAt'],
   // v24 — one row per salesperson per day: the effort behind the pipeline.
-  salesActivity: ['id', 'staffId', 'staffName', 'date', 'calls', 'messages', 'meetings', 'proposals', 'note', 'submittedAt'],
+  salesActivity: ['id', 'staffId', 'staffName', 'date', 'calls', 'messages', 'meetings', 'proposals', 'note', 'submittedAt', 'updatedAt'],
   config:   ['key', 'value']
 };
 
-const CODE_VERSION = 'v24-sales-pipeline';
+const CODE_VERSION = 'v25-sales-log-compliance';
 
 const DEFAULT_CLIENTS = ['Baaqat Flowers','Flovia Flowers','8th Cafe','Florens Flowers','Flat Chocolate','Al Rasa','Fedora Perfumes','Elite Party','Hair Salon'];
 const DEFAULT_EXEC_CODE = '99999';
@@ -1205,6 +1205,15 @@ function setMgmtScore(ss, params) {
 // in index.html.
 var HOLIDAYS = { '2026-08-28': 'Public holiday' };
 
+// Sales staff file one daily sales log instead of work-log entries (match by
+// first name; keep in step with SALES_STAFF in index.html). On time — first
+// saved by 19:30 the same day — it is worth a full day of entries; late, half,
+// the same weight a late entry carries.
+var SALES_STAFF = ['kaashish', 'kashish'];
+function isSalesStaffName(name) {
+  return SALES_STAFF.indexOf(String(name || '').trim().toLowerCase().split(/\s+/)[0]) >= 0;
+}
+
 function getLeaderboard(ss, month) {
   const tz = ss.getSpreadsheetTimeZone();
   const m = month || Utilities.formatDate(new Date(), tz, 'yyyy-MM');
@@ -1247,6 +1256,12 @@ function getLeaderboard(ss, month) {
     late: e.late === true || e.late === 'TRUE' || e.late === 'true'
   })).filter(e => e.date.slice(0, 7) === m);
 
+  const salesSh = ss.getSheetByName('salesActivity');
+  const salesLogs = salesSh ? sheetToObjects(salesSh).map(a => {
+    const date = String(dateCellToString(a.date, tz)), st = String(a.submittedAt || '');
+    return { staffId: String(a.staffId), date: date, onTime: st.slice(0, 10) === date && st.slice(11, 16) !== '' && st.slice(11, 16) <= '19:30' };
+  }).filter(a => a.date.slice(0, 7) === m) : [];
+
   const mgmt = {};
   const scoreSh = ss.getSheetByName('mgmtScores');
   if (scoreSh) {
@@ -1265,11 +1280,19 @@ function getLeaderboard(ss, month) {
     const attScore = Math.min(100, (daysPresent / workingDays) * 100);
 
     let credit = 0, totalEntries = 0;
-    entries.forEach(e => {
-      if (e.staffId !== sid) return;
-      totalEntries++;
-      credit += e.late ? 0.5 : 1;
-    });
+    if (isSalesStaffName(s.name)) {
+      salesLogs.forEach(a => {
+        if (a.staffId !== sid) return;
+        totalEntries += perDay;
+        credit += a.onTime ? perDay : perDay * 0.5;
+      });
+    } else {
+      entries.forEach(e => {
+        if (e.staffId !== sid) return;
+        totalEntries++;
+        credit += e.late ? 0.5 : 1;
+      });
+    }
     const expected = workingDays * perDay;
     const compScore = Math.min(100, (credit / expected) * 100);
 

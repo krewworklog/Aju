@@ -344,8 +344,8 @@ textarea{resize:vertical;line-height:1.6;}
     <aside class="sidebar">
       <div id="sb-staff" style="display:none">
         <div class="sbl">My Work</div>
-        <div class="nav active" onclick="gp('log',this)"><span class="nav-ic">✏️</span>Log Work</div>
-        <div class="nav" onclick="gp('my-logs',this)"><span class="nav-ic">📄</span>My Logs<span class="nbadge" id="b-mylog">0</span></div>
+        <div class="nav active" id="nav-log" onclick="gp('log',this)"><span class="nav-ic">✏️</span>Log Work</div>
+        <div class="nav" id="nav-my-logs" onclick="gp('my-logs',this)"><span class="nav-ic">📄</span>My Logs<span class="nbadge" id="b-mylog">0</span></div>
         <div class="nav" onclick="gp('my-tasks',this)"><span class="nav-ic">✅</span>My Tasks<span class="nbadge amber" id="b-mytasks">0</span></div>
         <div class="nav" onclick="gp('my-targets',this)"><span class="nav-ic">🎯</span>My Targets<span class="nbadge purple" id="b-mytargets">0</span></div>
         <div class="nav" onclick="gp('my-attendance',this)"><span class="nav-ic">🕘</span>My Attendance<span class="nbadge amber" id="b-myattn"></span></div>
@@ -929,7 +929,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v44';
+const APP_VERSION='v45';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1034,8 +1034,7 @@ function incCompliance(staff,month){
   const expected=days.length*2;
   let got=0;
   days.forEach(d=>{
-    const n=DB.entries.filter(e=>String(e.staffId)===String(staff.id)&&String(e.date)===d).length;
-    got+=Math.min(2,n);
+    got+=entrySlotsOn(staff,d);
   });
   return { expected, got, pct: expected?Math.round(got/expected*100):100, missed: Math.max(0,expected-got) };
 }
@@ -1408,6 +1407,14 @@ function updateClock(){
   const m=dubaiMinutes();
   const cdot=document.getElementById('cdot');
   const dc=document.getElementById('dl-chip');
+  // Sales staff have one deadline: the daily sales log by 7:30 PM.
+  if(session.role==='staff'&&session.user&&isSalesStaff(session.user.name)){
+    const log=salesLogFor(session.user.id,todayStr());
+    if(log&&salesLogOnTime(log)){cdot.className='pulse';dc.className='dl-chip dl-ok';dc.textContent='✓ Sales log submitted';}
+    else if(m<=SALES_LOG_DEADLINE.mins){const rem=SALES_LOG_DEADLINE.mins-m;cdot.className='pulse amber';dc.className='dl-chip dl-ok';dc.textContent=`${Math.floor(rem/60)}h ${rem%60}m to sales log (${SALES_LOG_DEADLINE.label})`;}
+    else{cdot.className='pulse red';dc.className='dl-chip dl-closed';dc.textContent='Sales log deadline passed';}
+    return;
+  }
   // Countdown to the next upcoming entry deadline (Dubai time).
   const next=ENTRIES.find(e=>m<=e.deadlineMins);
   if(next){
@@ -1537,10 +1544,14 @@ function launchApp(){
   const rc=document.getElementById('role-chip');rc.className='role-chip chip-'+role;rc.textContent=role.charAt(0).toUpperCase()+role.slice(1);
   ['sb-staff','sb-manager','sb-exec','sb-hr'].forEach(id=>document.getElementById(id).style.display='none');
   document.getElementById('sb-'+role).style.display='block';
-  document.getElementById('sb-sales-staff').style.display=role==='staff'&&isSalesStaff(name)?'block':'none';
+  const salesUser=role==='staff'&&isSalesStaff(name);
+  document.getElementById('sb-sales-staff').style.display=salesUser?'block':'none';
+  // Sales staff file a daily sales log instead of work-log entries.
+  ['nav-log','nav-my-logs'].forEach(id=>{document.getElementById(id).style.display=salesUser?'none':'';});
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
-  if(role==='staff'){initLogForm();document.getElementById('page-log').classList.add('active');document.querySelector('#sb-staff .nav').classList.add('active');}
+  if(salesUser){gp('my-pipeline',document.querySelector("#sb-sales-staff [onclick*=my-pipeline]"));}
+  else if(role==='staff'){initLogForm();document.getElementById('page-log').classList.add('active');document.querySelector('#sb-staff .nav').classList.add('active');}
   else if(role==='manager'){renderMgrDash();document.getElementById('page-mgr-dash').classList.add('active');document.querySelector('#sb-manager .nav').classList.add('active');}
   else if(role==='hr'){renderExecSalary();document.getElementById('page-exec-salary').classList.add('active');document.querySelector('#sb-hr .nav').classList.add('active');}
   else{renderExecDash();document.getElementById('page-exec-dash').classList.add('active');document.querySelector('#sb-exec .nav').classList.add('active');}
@@ -1891,7 +1902,7 @@ function renderCompMissed(){
   days.forEach(date=>{
     staffRows.forEach(r=>{
       if(r.s.createdAt&&String(r.s.createdAt).slice(0,10)>date)return;
-      const n=DB.entries.filter(e=>String(e.staffId)===String(r.s.id)&&String(e.date)===date).length;
+      const n=entrySlotsOn(r.s,date);
       if(n===0)r.full.push(date);else if(n===1)r.partial.push(date);
     });
   });
@@ -2198,8 +2209,7 @@ function salaryRowFor(s,month,days,monthOver){
     if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
     if(date<=GRACE_UNTIL)return;              // graced: entries not counted
     if(leaveOn(s.id,date))return;            // on leave: nothing was expected
-    const n=DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length;
-    missedSlots+=Math.max(0,2-n);
+    missedSlots+=Math.max(0,2-entrySlotsOn(s,date));
   });
   const att=attnMonthlyForSalary(s,days,month);
   // Executive adjustments ride on top of the rules. Every automatic figure is
@@ -2797,6 +2807,7 @@ function renderExecSalary(){
   renderExecSalarySetter();
   const banner=document.getElementById('sal-banner');
   let notes=[];
+  if((DB.staff||[]).some(x=>isSalesStaff(x.name)))notes.push(`Sales staff file one daily sales log instead of work-log entries. A log saved by ${SALES_LOG_DEADLINE.label} counts as both entries; a missing or late log counts as 2 missed.`);
   if(!attnActive)notes.push('Attendance-based pay applies from August 2026 — for this month full base pay is used regardless of hours.');
   if(!cutsActive)notes.push('Entry deductions (20 AED each) apply from August 2026 — this month shows missed counts only, with no entry cut.');
   if(!monthOver)notes.push(`Month still in progress — the ${TARGET_CUT_PCT}% target cut only applies if the goal is still unmet at month end.`);
@@ -3884,6 +3895,20 @@ const SALES_SOURCES=['Instagram','Facebook','LinkedIn','Google / Website','Refer
 const SALES_LOST=['Price too high','Chose another agency','No budget right now','No response','Not a fit','Other'];
 const SALES_STAGE_TAG={New:'t-used',Contacted:'t-cl',Meeting:'t-cl',Proposal:'t-pu',Negotiation:'t-late',Won:'t-ok',Lost:'t-pend'};
 
+// One sales log a day, due by 7:30 PM (the Entry 2 deadline). On time it
+// counts as both work-log entries; missing or late it counts as both missed.
+const SALES_LOG_DEADLINE={mins:19*60+30,label:'7:30 PM'};
+function salesLogFor(staffId,date){return (DB.salesActivity||[]).find(a=>String(a.staffId)===String(staffId)&&a.date===date);}
+function salesLogOnTime(a){
+  const st=String(a&&a.submittedAt||''), d=st.slice(0,10), t=st.slice(11,16);
+  return d===a.date&&!!t&&t<=pad(Math.floor(SALES_LOG_DEADLINE.mins/60))+':'+pad(SALES_LOG_DEADLINE.mins%60);
+}
+// Work-log entry slots (0-2) a staff member filled on a day. Everyone else is
+// counted from their entries; sales staff from their daily sales log.
+function entrySlotsOn(s,date){
+  if(isSalesStaff(s.name)){const a=salesLogFor(s.id,date);return a&&salesLogOnTime(a)?2:0;}
+  return Math.min(2,DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length);
+}
 function isSalesStaff(name){
   const f=String(name||'').trim().toLowerCase().split(/\s+/)[0];
   return SALES_STAFF.some(n=>n.toLowerCase()===f);
@@ -4061,6 +4086,9 @@ function renderMyActivity(){
   const leadsWk=salesLeadsFor(session.user.id).filter(l=>l.createdAt>=wk&&l.createdAt<=t).length;
   el.innerHTML=`
     <div class="card">
+      ${(()=>{const lg=salesLogFor(session.user.id,t),late=dubaiMinutes()>SALES_LOG_DEADLINE.mins;
+        return lg&&salesLogOnTime(lg)?`<div class="tag t-ok" style="margin-bottom:12px">✓ Today's log was submitted on time (${String(lg.submittedAt).slice(11,16)}). It counts as both entries.</div>`
+          :`<div class="tag ${late?'t-pend':'t-late'}" style="margin-bottom:12px">${late?`⚠ The ${SALES_LOG_DEADLINE.label} deadline has passed. Today's log now counts as missed entries.`:`⏰ Due by ${SALES_LOG_DEADLINE.label}. On time, it counts as both of today's entries.`}</div>`;})()}
       <div class="ct">Today's activity</div>
       <div class="fg">
         <div class="f"><label>Date</label><input type="date" id="sa-date" value="${t}" max="${t}" onchange="salesActivityDate()"></div>
@@ -4071,7 +4099,7 @@ function renderMyActivity(){
         <div class="f full"><label>Note (optional)</label><input id="sa-note" value="${escapeHtml(row.note||'')}" placeholder="Anything worth knowing about today"></div>
       </div>
       <button class="btn btn-primary" style="margin-top:14px" onclick="saveSalesActivity()">${row.id?'💾 Update':'✔ Save'} activity</button>
-      <span style="font-size:12px;color:var(--ink3);margin-left:10px">Takes 2 minutes. Fill it in before you leave each day.</span>
+      <span style="font-size:12px;color:var(--ink3);margin-left:10px">Takes 2 minutes. You can update the numbers later; the time of your first save is what counts.</span>
     </div>
     <div class="sg">
       <div class="sc"><div class="sl">Calls this week</div><div class="sv sv-ac">${sum(thisWeek,'calls')}</div></div>
@@ -4098,9 +4126,10 @@ async function saveSalesActivity(){
   if(!date||date>todayStr()){toast('Choose today or an earlier date.','err');return;}
   if(date<salesWeekStart(todayStr())&&!confirm('That date is before this week. Save it anyway?'))return;
   const n=k=>String(Math.max(0,parseInt(g(k)||'0',10)||0));
-  const obj={id:'sa'+Date.now(),staffId:session.user.id,staffName:session.user.name,date,
+  const prev=salesLogFor(session.user.id,date), now=todayStr()+' '+nowTime();
+  const obj={id:prev?prev.id:'sa'+Date.now(),staffId:session.user.id,staffName:session.user.name,date,
     calls:n('calls'),messages:n('messages'),meetings:n('meetings'),proposals:n('proposals'),note:g('note'),
-    submittedAt:todayStr()+' '+nowTime()};
+    submittedAt:prev&&prev.submittedAt?prev.submittedAt:now,updatedAt:now};
   try{await api('saveSalesActivity',{data:obj});await syncAll();toast('Activity saved ✅','ok');}
   catch(e){toast('Could not save: '+e.message,'err');}
 }
