@@ -417,11 +417,10 @@ textarea{resize:vertical;line-height:1.6;}
     <main class="content">
       <!-- STAFF: LOG WORK -->
       <div class="page active" id="page-log">
-        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Log twice a day — Entry 1 by 3:00 PM and Entry 2 by 7:30 PM (Dubai time).</p></div></div>
+        <div class="ph"><div><div class="pt">Log Your Work</div><p class="ps">Log your work once a day, by 7:30 PM (Dubai time).</p></div></div>
         <div class="card"><div class="ct">Which entry are you logging?</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap" id="entry-tabs">
-            <button type="button" class="entry-tab" id="entry-tab-1" onclick="setEntry(1)">Entry 1<span class="et-sub" id="et-sub-1">Due 3:00 PM</span></button>
-            <button type="button" class="entry-tab" id="entry-tab-2" onclick="setEntry(2)">Entry 2<span class="et-sub" id="et-sub-2">Due 7:30 PM</span></button>
+            <button type="button" class="entry-tab" id="entry-tab-1" onclick="setEntry(1)">Daily entry<span class="et-sub" id="et-sub-1">Due 7:30 PM</span></button>
           </div>
           <div id="entry-status" style="margin-top:10px;font-size:13px;color:var(--ink2)"></div>
         </div>
@@ -452,7 +451,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- STAFF: MY LOGS -->
       <div class="page" id="page-my-logs">
-        <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit a log before its own deadline (Entry 1 · 3:00 PM, Entry 2 · 7:30 PM).</p></div></div>
+        <div class="ph"><div><div class="pt">My Logs</div><p class="ps">Your submitted entries. Edit a log before its deadline (7:30 PM).</p></div></div>
         <div id="my-logs-window"></div>
         <div id="my-logs-list"></div>
       </div>
@@ -519,7 +518,7 @@ textarea{resize:vertical;line-height:1.6;}
 
       <!-- MANAGER: CODES -->
       <div class="page" id="page-mgr-codes">
-        <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 3:00 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
+        <div class="ph"><div><div class="pt">One-Time Approval Codes</div><p class="ps">Manager window: 7:30 PM – 9:00 PM.</p></div><button class="btn btn-primary btn-sm" onclick="openGenCodeModal('manager')" id="mgr-gen-btn">＋ Generate New Code</button></div>
         <div id="mgr-code-window-info"></div>
         <div class="sg" id="mgr-codes-stats"></div>
         <div class="card"><div class="ct">Codes Issued by You</div>
@@ -929,7 +928,7 @@ async function api(action, data={}) {
 // The app is served from GitHub Pages; a new deploy just changes the files.
 // Poll a tiny version file and offer a one-tap refresh when it changes, so
 // nobody has to know about cache-clearing rituals.
-const APP_VERSION='v45';
+const APP_VERSION='v46';
 // Dismissed for this session only — reloading is what applies the update
 // anyway, so there is nothing to remember beyond the current page life.
 let updateDeferred=false;
@@ -1025,13 +1024,14 @@ function incWorkdays(month,end,createdAt){
   }
   return days;
 }
-// Entry compliance: submitted entry-slots ÷ expected slots (2 per working day).
+// Entry compliance: submitted entry-slots ÷ expected slots (1 per working day
+// from 4 Nov 2026, 2 per day before).
 function incCompliance(staff,month){
   const monthEnd=new Date(Date.UTC(+month.slice(0,4),+month.slice(5,7),0)).toISOString().slice(0,10);
   const today=todayStr();
   const end = today>monthEnd?monthEnd:(today.slice(0,7)===month?today:monthEnd);
   const days=incWorkdays(month,end,staff.createdAt);
-  const expected=days.length*2;
+  const expected=days.reduce((n,d)=>n+slotsExpected(d),0);
   let got=0;
   days.forEach(d=>{
     got+=entrySlotsOn(staff,d);
@@ -1350,12 +1350,18 @@ function dubaiMinutes(d){const u=dubaiDate(d);return u.getUTCHours()*60+u.getUTC
 function todayStr(){return localDateStr(new Date());}
 function nowTime(){return localTime();}
 
-// Two work-log entries per staff per day, each with its own Dubai-time deadline.
+// One work-log entry per staff per day, due 7:30 PM Dubai (from 4 Nov 2026).
+// Until 3 Nov there were two (Entry 1 by 3:00 PM, Entry 2 by 7:30 PM); older
+// entries keep their stored label, and compliance/cuts for those days still
+// expect two (see slotsExpected).
+const ONE_ENTRY_FROM='2026-11-04';
 const ENTRIES=[
-  {num:1,label:'Entry 1',deadlineMins:15*60,    deadlineLabel:'3:00 PM'},
-  {num:2,label:'Entry 2',deadlineMins:19*60+30, deadlineLabel:'7:30 PM'},
+  {num:1,label:'Daily entry',deadlineMins:19*60+30, deadlineLabel:'7:30 PM'},
 ];
-function entryDef(n){return ENTRIES.find(e=>e.num===Number(n))||ENTRIES[0];}
+const LEGACY_ENTRY2={num:2,label:'Entry 2',deadlineMins:19*60+30, deadlineLabel:'7:30 PM'};
+function entryDef(n){return ENTRIES.find(e=>e.num===Number(n))||(Number(n)===2?LEGACY_ENTRY2:ENTRIES[0]);}
+// Entry slots expected on a working day: 2 before the switch, 1 from it.
+function slotsExpected(date){return String(date||'')>=ONE_ENTRY_FROM?1:2;}
 // One-off correction window: entries dated 1–4 Aug can be re-opened and fixed
 // by the staff member who logged them, up to the end of 5 Aug (Dubai). After
 // that the normal rule returns — an entry is editable only before its own
@@ -1386,8 +1392,9 @@ function inEditWindow(dateStr){
 }
 let currentEntry=1; // which entry the staff is currently logging
 function isLateForEntry(n){return dubaiMinutes()>entryDef(n).deadlineMins;}
-// FEATURE 1: Entry 2 is locked until the Entry 1 deadline (Entry 1 is always open).
-function entryLocked(n){return Number(n)===2 && dubaiMinutes()<ENTRIES[0].deadlineMins;}
+// Entry 2 used to stay locked until the Entry 1 deadline. With one daily
+// entry there is nothing to lock.
+function entryLocked(n){return false;}
 function isLate(){return isLateForEntry(currentEntry);}
 // Manager-issued codes: from the first deadline until 9 PM; exec after.
 function canManagerIssueCodes(){const m=dubaiMinutes();return m>=ENTRIES[0].deadlineMins && m<21*60;}
@@ -2209,7 +2216,7 @@ function salaryRowFor(s,month,days,monthOver){
     if(s.createdAt&&String(s.createdAt).slice(0,10)>date)return;
     if(date<=GRACE_UNTIL)return;              // graced: entries not counted
     if(leaveOn(s.id,date))return;            // on leave: nothing was expected
-    missedSlots+=Math.max(0,2-entrySlotsOn(s,date));
+    missedSlots+=Math.max(0,slotsExpected(date)-entrySlotsOn(s,date));
   });
   const att=attnMonthlyForSalary(s,days,month);
   // Executive adjustments ride on top of the rules. Every automatic figure is
@@ -3214,7 +3221,7 @@ function renderExecDash(){
   const lateToday=rows.filter(r=>r.a&&attnLateBy(r.a)>0);
   const notIn=rows.filter(r=>!r.a||!r.a.checkIn);
   const entriesToday=rows.reduce((s,r)=>s+r.entriesToday,0);
-  const entriesExpected=staff.length*2;
+  const entriesExpected=staff.length*slotsExpected(todayStr());
   const avgComp=rows.length?Math.round(rows.reduce((s,r)=>s+r.comp.pct,0)/rows.length):100;
   const totLate=rows.reduce((s,r)=>s+r.lateCount,0);
   const totEarly=rows.reduce((s,r)=>s+r.earlyCount,0);
@@ -3255,7 +3262,7 @@ function renderExecDash(){
       <td>${r.lateCount?`<span class="tag t-late">${r.lateCount}×</span>`:'<span style="color:var(--ink3)">—</span>'}</td>
       <td>${r.earlyCount?`<span class="tag t-late">${r.earlyCount}×</span>`:'<span style="color:var(--ink3)">—</span>'}</td></tr>`).join('')}
     </tbody></table>
-    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Late = check-in after 10:00. Early = check-out before 19:00 (Sat 14:00). Compliance = submitted entry slots ÷ expected (2 per working day, Sundays off).</p>`;
+    <p style="font-size:11px;color:var(--ink3);margin-top:10px">Late = check-in after 10:00. Early = check-out before 19:00 (Sat 14:00). Compliance = submitted entries ÷ expected (1 per working day from 4 Nov 2026, 2 before; Sundays off).</p>`;
 }
 function renderExecEntries(){
   const nf=document.getElementById('ef-name').value.toLowerCase();
@@ -3895,19 +3902,21 @@ const SALES_SOURCES=['Instagram','Facebook','LinkedIn','Google / Website','Refer
 const SALES_LOST=['Price too high','Chose another agency','No budget right now','No response','Not a fit','Other'];
 const SALES_STAGE_TAG={New:'t-used',Contacted:'t-cl',Meeting:'t-cl',Proposal:'t-pu',Negotiation:'t-late',Won:'t-ok',Lost:'t-pend'};
 
-// One sales log a day, due by 7:30 PM (the Entry 2 deadline). On time it
-// counts as both work-log entries; missing or late it counts as both missed.
+// One sales log a day, due by 7:30 PM (the daily entry deadline). On time it
+// counts as that day's work-log entries; missing or late it counts as missed.
 const SALES_LOG_DEADLINE={mins:19*60+30,label:'7:30 PM'};
 function salesLogFor(staffId,date){return (DB.salesActivity||[]).find(a=>String(a.staffId)===String(staffId)&&a.date===date);}
 function salesLogOnTime(a){
   const st=String(a&&a.submittedAt||''), d=st.slice(0,10), t=st.slice(11,16);
   return d===a.date&&!!t&&t<=pad(Math.floor(SALES_LOG_DEADLINE.mins/60))+':'+pad(SALES_LOG_DEADLINE.mins%60);
 }
-// Work-log entry slots (0-2) a staff member filled on a day. Everyone else is
-// counted from their entries; sales staff from their daily sales log.
+// Work-log entry slots a staff member filled on a day (0-2 before 4 Nov 2026,
+// 0-1 from then). Everyone else is counted from their entries; sales staff
+// from their daily sales log.
 function entrySlotsOn(s,date){
-  if(isSalesStaff(s.name)){const a=salesLogFor(s.id,date);return a&&salesLogOnTime(a)?2:0;}
-  return Math.min(2,DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length);
+  const cap=slotsExpected(date);
+  if(isSalesStaff(s.name)){const a=salesLogFor(s.id,date);return a&&salesLogOnTime(a)?cap:0;}
+  return Math.min(cap,DB.entries.filter(e=>String(e.staffId)===String(s.id)&&String(e.date)===date).length);
 }
 function isSalesStaff(name){
   const f=String(name||'').trim().toLowerCase().split(/\s+/)[0];
