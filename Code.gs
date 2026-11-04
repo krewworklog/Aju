@@ -1210,6 +1210,10 @@ var HOLIDAYS = { '2026-08-28': 'Public holiday' };
 // saved by 19:30 the same day — it is worth a full day of entries; late, half,
 // the same weight a late entry carries.
 var SALES_STAFF = ['kaashish', 'kashish'];
+
+// Work-log entries per day dropped from two to one on this date (keep in step
+// with ONE_ENTRY_FROM in index.html).
+var ONE_ENTRY_FROM = '2026-11-04';
 function isSalesStaffName(name) {
   return SALES_STAFF.indexOf(String(name || '').trim().toLowerCase().split(/\s+/)[0]) >= 0;
 }
@@ -1233,13 +1237,18 @@ function getLeaderboard(ss, month) {
   const lastDay = isCurrentMonth ? parseInt(todayStr.slice(8, 10), 10) : lastDayOfMonth;
 
   const pad2 = n => (n < 10 ? '0' + n : '' + n);
-  let workingDays = 0;
+  // One work-log entry a day from ONE_ENTRY_FROM (4 Nov 2026); before that,
+  // entriesPerDay (default 2). Expected entries are summed day by day so a
+  // month that spans the switch is scored fairly.
+  const perDayFor = ds => (ds >= ONE_ENTRY_FROM ? 1 : perDay);
+  let workingDays = 0, expectedEntries = 0;
   for (let d = 1; d <= lastDay; d++) {
     const ds = y + '-' + pad2(mo) + '-' + pad2(d);
     if (HOLIDAYS[ds]) continue;                       // public holiday
-    if (new Date(y, mo - 1, d).getDay() !== offDay) workingDays++;
+    if (new Date(y, mo - 1, d).getDay() !== offDay) { workingDays++; expectedEntries += perDayFor(ds); }
   }
   if (workingDays < 1) workingDays = 1;
+  if (expectedEntries < 1) expectedEntries = 1;
 
   // ---- raw data ----
   const staff = sheetToObjects(ss.getSheetByName('staff'));
@@ -1283,17 +1292,22 @@ function getLeaderboard(ss, month) {
     if (isSalesStaffName(s.name)) {
       salesLogs.forEach(a => {
         if (a.staffId !== sid) return;
-        totalEntries += perDay;
-        credit += a.onTime ? perDay : perDay * 0.5;
+        const pd = perDayFor(a.date);
+        totalEntries += pd;
+        credit += a.onTime ? pd : pd * 0.5;
       });
     } else {
+      // Credit per day is capped at that day's expected entries, so extra
+      // entries on one day can't make up for a missed day.
+      const byDay = {};
       entries.forEach(e => {
         if (e.staffId !== sid) return;
         totalEntries++;
-        credit += e.late ? 0.5 : 1;
+        byDay[e.date] = (byDay[e.date] || 0) + (e.late ? 0.5 : 1);
       });
+      Object.keys(byDay).forEach(ds => { credit += Math.min(perDayFor(ds), byDay[ds]); });
     }
-    const expected = workingDays * perDay;
+    const expected = expectedEntries;
     const compScore = Math.min(100, (credit / expected) * 100);
 
     const mgmtScore = mgmt[sid] !== undefined ? mgmt[sid] : 0;
@@ -1317,7 +1331,7 @@ function getLeaderboard(ss, month) {
   return {
     month: m,
     workingDays: workingDays,
-    expectedEntries: workingDays * perDay,
+    expectedEntries: expectedEntries,
     weights: { attendance: wA, compliance: wC, management: wM },
     rows: rows
   };
